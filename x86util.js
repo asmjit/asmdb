@@ -1,62 +1,47 @@
-// [X86/X64 - Generator]
-// X86/X64 instruction table generator targeting AsmJit.
+// [x86util.js]
+// X86/X64 instruction-set utilities that use `x86data.js`.
 
 "use strict";
+const x86data = require("./x86data.js");
+const hasOwn = Object.prototype.hasOwnProperty;
 
-var fs = require("fs");
-var x86db = require("./arch-x86db");
-
-var hasOwn = Object.prototype.hasOwnProperty;
-
-// ============================================================================
-// [Class]
-// ============================================================================
-
-// Minimalist class-based system.
-function Class(opt) {
-  var C = opt.$construct || function() {};
-  var p = C.prototype;
-
-  for (var k in opt)
-    if (k !== "$construct")
-      p[k] = opt[k];
-
-  return C;
+function dict() {
+  return Object.create(null);
 }
 
 // ============================================================================
 // [Utils]
 // ============================================================================
 
-var Utils = {
+class Utils {
   // String comparison, returns 0, -1, or 1.
-  strcmp: function(a, b) { return (a < b) ? -1 : a === b ? 0 : 1; },
+  static strcmp(a, b) { return (a < b) ? -1 : a === b ? 0 : 1; }
   // Trim left side of a string `s` and return a new string.
-  trimLeft: function(s) { return s ? s.replace(/^\s+/, "") : ""; },
+  static trimLeft(s) { return s ? s.replace(/^\s+/, "") : ""; }
   // Uppercase the first character of a string `s` and return a new string.
-  upFirst: function(s) { return s ? s.charAt(0).toUpperCase() + s.substr(1) : ""; },
+  static upFirst(s) { return s ? s.charAt(0).toUpperCase() + s.substr(1) : ""; }
 
   // Repeat a string `s` by `n` times.
-  repeat: function(s, n) {
+  static repeat(s, n) {
     var out = "";
     for (var i = 0; i < n; i++) out += s;
     return out;
-  },
+  }
 
   // Pad `s` left with spaces so the resulting string has `n` characters total.
-  padLeft: function(s, n) { return Utils.repeat(" ", Math.max(n - s.length, 0)) + s; },
+  static padLeft(s, n) { return Utils.repeat(" ", Math.max(n - s.length, 0)) + s; }
   // Pad `s` right with spaces so the resulting string has `n` characters total.
-  padRight: function(s, n) { return s + Utils.repeat(" ", Math.max(n - s.length, 0)); },
+  static padRight(s, n) { return s + Utils.repeat(" ", Math.max(n - s.length, 0)); }
 
-  mapFromArray: function(arr) {
-    var map = {};
+  static mapFromArray(arr) {
+    var map = dict();
     for (var i = 0; i < arr.length; i++)
       map[arr[i]] = true;
     return map;
-  },
-  
+  }
+
   // Inject `data` to the string `s` replacing the content from `start` to `end`.
-  inject: function(s, start, end, data) {
+  static inject(s, start, end, data) {
     var iStart = s.indexOf(start);
     var iEnd   = s.indexOf(end);
 
@@ -64,11 +49,11 @@ var Utils = {
     if (iEnd   === -1) throw new Error("Couldn't locate end mark.");
 
     return s.substr(0, iStart + start.length) + data + s.substr(iEnd);
-  },
+  }
 
   // Build an object containing CPU registers as keys mapping them to a registers' group.
-  buildCpuRegs: function(defs) {
-    var obj = {};
+  static buildCpuRegs(defs) {
+    var obj = dict();
 
     for (var group in defs) {
       var regs = defs[group];
@@ -91,24 +76,25 @@ var Utils = {
 
     return obj;
   }
-};
+}
+exports.Utils = Utils;
 
 // ============================================================================
 // [Constants]
 // ============================================================================
 
-// Indexes used by x86 data.
-var kIndexName       = 0;
-var kIndexOperands   = 1;
-var kIndexEncoding   = 2;
-var kIndexOpcode     = 3;
-var kIndexFlags      = 4;
+// Indexes used by x86-data.
+const kIndexName       = 0;
+const kIndexOperands   = 1;
+const kIndexEncoding   = 2;
+const kIndexOpcode     = 3;
+const kIndexFlags      = 4;
 
-var kCpuArchitecture = Utils.mapFromArray(x86db.architectures);
-var kCpuFeatures     = Utils.mapFromArray(x86db.features);
+const kCpuArchitecture = Utils.mapFromArray(x86data.architectures);
+const kCpuFeatures     = Utils.mapFromArray(x86data.features);
 
 // Only registers used by instructions.
-var kCpuRegs = Utils.buildCpuRegs({
+const kCpuRegs = Utils.buildCpuRegs({
   "reg": [
     "r8", "r16", "r32", "r64", "reg", "rxx",
     "al", "ah" , "ax" , "eax", "rax", "zax",
@@ -131,7 +117,7 @@ var kCpuRegs = Utils.buildCpuRegs({
   "zmm" : ["zmm"  , "zmm0-31"]
 });
 
-var kCpuFlags = {
+const kCpuFlags = {
   "OF": true, // Overflow flag.
   "SF": true, // Sign flag.
   "ZF": true, // Zero flag.
@@ -148,96 +134,26 @@ var kCpuFlags = {
 };
 
 // ============================================================================
-// [CombinedString]
-// ============================================================================
-
-// Combined string is used to combine multiple strings into a single string and
-// helpers to export a working C/C++ code that can be injected to a .cpp file.
-//
-// It helps to store a large amount of small strings without a need for runtime
-// relocation. For example if you want to store 3 strings, "morning", "noon",
-// and "evening", a `CombinedString` will be used like this:
-//
-// ```
-// var combined = new CombinedString();
-// combined.add("morning");
-// combined.add("noon");
-// combined.add("evening");
-// ```
-//
-// Then a `CombinedString.format()` method can be called to generate a C/C++
-// code of that string:
-//
-// ```
-// const char combined[] =
-//   "evening\0"
-//   "morning\0"
-//   "noon\0";
-// ```
-var CombinedString = Class({
-  $construct: function() {
-    this.map = {};   // Access an index based on string.
-    this.array = []; // Access a string based on the index.
-    this.total = 0;  // Total size of all strings including their NULL terminators.
-  },
-
-  // Get index of a string `s`.
-  get: function(s) {
-    return hasOwn.call(this.map, s) ? this.map[s] : -1;
-  },
-
-  // Add a string `s` into the combined string.
-  //
-  // The string is only added once, multiple strings will always refer to the
-  // same index.
-  add: function(s) {
-    if (hasOwn.call(this.map, s))
-      return this.map[s];
-
-    var i = this.total;
-    this.total += s.length + 1;
-
-    this.map[s] = i;
-    this.array.push(s);
-
-    return i;
-  },
-
-  format: function(indent) {
-    var a = this.array;
-    var s = "";
-
-    for (var i = 0; i < a.length; i++) {
-      s += indent;
-      s += "\"" + a[i] + "\\0\"";
-      s += ((i === a.length - 1) ? ";" : "") + "\n";
-    }
-
-    return s;
-  }
-});
-
-// ============================================================================
 // [X86Util]
 // ============================================================================
 
 // X86/X64 utilities.
-var X86Util = {
+class X86Util {
   // Get whether the string `s` describes a register operand.
-  isRegOp: function(s) { return s && hasOwn.call(kCpuRegs, s); },
+  static isRegOp(s) { return s && hasOwn.call(kCpuRegs, s); }
   // Get whether the string `s` describes a memory operand.
-  isMemOp: function(s) { return s && /^(?:mem|mxx|(?:m(?:off)?\d+(?:dec|bcd|fp|int)?)|(?:vm\d+(?:x|y|z)))$/.test(s); },
+  static isMemOp(s) { return s && /^(?:mem|mxx|(?:m(?:off)?\d+(?:dec|bcd|fp|int)?)|(?:vm\d+(?:x|y|z)))$/.test(s); }
   // Get whether the string `s` describes an immediate operand.
-  isImmOp: function(s) { return s && /^(?:1|ib|iw|id|iq)$/.test(s); },
+  static isImmOp(s) { return s && /^(?:1|ib|iw|id|iq)$/.test(s); }
   // Get whether the string `s` describes a relative displacement (label).
-  isRelOp: function(s) { return s && /^rel\d+$/.test(s); },
+  static isRelOp(s) { return s && /^rel\d+$/.test(s); }
   // Get a register class based on string `s`, or `null` if `s` is not a register.
-  regClass: function(s) { return kCpuRegs[s] || null; },
+  static regClass(s) { return kCpuRegs[s] || null; }
 
   // Get size in bytes of an immediate `s`.
   //
   // Handles "ib", "iw", "id", "iq", and also "/is4".
-  immSize: function(s) {
+  static immSize(s) {
     if (s === "1" ) return 0;
     if (s === "ib" || s === "/is4") return 1;
     if (s === "iw") return 2;
@@ -245,26 +161,27 @@ var X86Util = {
     if (s === "iq") return 8;
 
     return -1;
-  },
+  }
 
   // Get size in bytes of a relative displacement.
   //
   // Handles "rel8" and "rel32".
-  relSize: function(s) {
+  static relSize(s) {
     if (s === "rel8") return 1;
     if (s === "rel32") return 4;
 
     return -1;
   }
-};
+}
+exports.X86Util = X86Util;
 
 // ============================================================================
 // [X86Operand]
 // ============================================================================
 
 // X86/X64 operand
-var X86Operand = Class({
-  $construct: function(data, defaultAccess) {
+class X86Operand {
+  constructor(data, defaultAccess) {
     this.data = data;       // The operand's data (processed).
 
     this.reg = "";          // Register operand's definition.
@@ -379,50 +296,50 @@ var X86Operand = Class({
         continue;
       }
 
-      console.log("Unhandled operand: '" + op + "'");
+      console.log(`Unhandled operand: '${op}'`);
     }
-  },
+  }
 
-  setAccess: function(access) {
+  setAccess(access) {
     this.read  = access === "R" || access === "X";
     this.write = access === "W" || access === "X";
     return this;
-  },
+  }
 
-  isReg: function() { return !!this.reg; },
-  isMem: function() { return !!this.mem; },
-  isImm: function() { return !!this.imm; },
-  isRel: function() { return !!this.rel; },
+  isReg() { return !!this.reg; }
+  isMem() { return !!this.mem; }
+  isImm() { return !!this.imm; }
+  isRel() { return !!this.rel; }
 
-  isRegAndMem: function() { return !!this.reg && !!this.mem; },
-  isRegOrMem : function() { return !!this.reg || !!this.mem; },
+  isRegAndMem() { return !!this.reg && !!this.mem; }
+  isRegOrMem() { return !!this.reg || !!this.mem; }
 
-  toRegMem: function() {
+  toRegMem() {
     if (this.reg && this.mem)
-      return this.reg + "/" + "m";
+      return this.reg + "/m";
     else if (this.mem && (this.vsibReg || /fp$|int$/.test(this.mem)))
       return this.mem;
     else if (this.mem)
       return "m";
     else
       return this.toString();
-  },
+  }
 
-  toString: function() { return this.data; }
-});
+  toString() { return this.data; }
+}
+exports.X86Operand = X86Operand;
 
 // ============================================================================
 // [X86Inst]
 // ============================================================================
 
 // X86/X64 instruction.
-var X86Inst = Class({
-  $construct: function(name, operands, encoding, opcode, flags) {
+class X86Inst {
+  constructor(name, operands, encoding, opcode, flags) {
     this.name = name;       // Instruction name.
     this.arch = "ANY";      // Architecture - ANY, X86, X64.
 
     this.prefix = "";       // Prefix - "", "3DNOW", "EVEX", "VEX", "XOP".
-
     this.opcode = "";       // A single opcode byte as a hex string, "00-FF".
     this.opcodeInt = 0;     // A single opcode byte as an integer (0..255).
     this.opcodeString = ""; // The whole opcode string, as specified in manual.
@@ -447,8 +364,8 @@ var X86Inst = Class({
     this.lock = false;      // Can be used with LOCK prefix.
     this.rep = false;       // Can be used with REP prefix.
     this.xcr = "";          // Reads or writes to/from XCR register.
-    this.cpu = {};          // CPU features required to execute the instruction.
-    this.eflags = {};       // CPU flags read/written/zeroed/set/undefined.
+    this.cpu = dict();      // CPU features required to execute the instruction.
+    this.eflags = dict();   // CPU flags read/written/zeroed/set/undefined.
 
     this.volatile = false;  // Volatile instruction hint for the instruction scheduler.
     this.privilege = 3;     // Privilege level required to execute the instruction.
@@ -482,14 +399,22 @@ var X86Inst = Class({
 
     this.assignOpcode(opcode);
     this.assignFlags(flags);
-  },
+  }
 
-  isAVX : function() { return this.isVEX() || this.isEVEX(); },
-  isVEX : function() { return this.prefix === "VEX" || this.prefix === "XOP"; },
-  isEVEX: function() { return this.prefix === "EVEX" },
+  isAVX() { return this.isVEX() || this.isEVEX(); }
+  isVEX() { return this.prefix === "VEX" || this.prefix === "XOP"; }
+  isEVEX() { return this.prefix === "EVEX" }
+
+  getWValue() {
+    switch (this.w) {
+      case "W0": return 0;
+      case "W1": return 1;
+    }
+    return -1;
+  }
 
   // Get signature of the instruction in form "ARCH PREFIX ENCODING[:operands]"
-  getSignature: function() {
+  getSignature() {
     var operands = this.operands;
     var sign = this.arch;
 
@@ -499,7 +424,7 @@ var X86Inst = Class({
         if (this.l === "L1")
           sign += ".256";
         else if (this.l === "256" || this.l === "512")
-          sign += "." + this.l;
+          sign += `.${this.l}`;
         else
           sign += ".128";
 
@@ -508,7 +433,7 @@ var X86Inst = Class({
       }
     }
     else if (this.w === "W1") {
-      sign += " " + "REX.W";
+      sign += " REX.W";
     }
 
     sign += " " + this.encoding;
@@ -518,15 +443,15 @@ var X86Inst = Class({
 
       var operand = operands[i];
       if (operand.implicit)
-        sign += "[" + operand.reg + "]";
+        sign += `[${operand.reg}]`;
       else
         sign += operand.toRegMem();
     }
 
     return sign;
-  },
+  }
 
-  getImmCount: function() {
+  getImmCount() {
     var ops = this.operands;
     var n = 0;
 
@@ -536,9 +461,9 @@ var X86Inst = Class({
     }
 
     return n;
-  },
+  }
 
-  assignOperands: function(s) {
+  assignOperands(s) {
     if (!s)
       return;
 
@@ -582,13 +507,13 @@ var X86Inst = Class({
 
       this.operands.push(operand);
     }
-  },
+  }
 
-  assignEncoding: function(s) {
+  assignEncoding(s) {
     this.encoding = s;
-  },
+  }
 
-  assignOpcode: function(s) {
+  assignOpcode(s) {
     this.opcodeString = s;
 
     var parts = s.split(" ");
@@ -623,7 +548,7 @@ var X86Inst = Class({
         if (/^WIG|W0|W1$/.test(comp)) { this.w = comp; continue; }
 
         // ERROR.
-        this.report("'" + this.opcodeString + "' Unhandled component: " + comp);
+        this.report(`'${this.opcodeString}' Unhandled component: ${comp}`);
       }
 
       for (i = 1; i < parts.length; i++) {
@@ -647,7 +572,7 @@ var X86Inst = Class({
           continue;
         }
 
-        this.report("'" + this.opcodeString + "' Unhandled opcode component " + comp + ".");
+        this.report(`'${this.opcodeString}' Unhandled opcode component: ${comp}`);
       }
     }
     else {
@@ -717,7 +642,7 @@ var X86Inst = Class({
             if (this.opcode === "67")
               this._67h = true;
             else
-              this.report("'" + this.opcodeString + "' Multiple opcodes, have " + this.opcode + ", found " + comp + ".");
+              this.report(`'${this.opcodeString}' Multiple opcodes, have ${this.opcode}, found ${comp}`);
           }
 
           this.opcode = comp;
@@ -743,11 +668,11 @@ var X86Inst = Class({
         }
 
         // ERROR.
-        this.report("'" + this.opcodeString + "' Unhandled opcode component " + comp + ".");
+        this.report(`'${this.opcodeString}' Unhandled opcode component ${comp}`);
       }
     }
 
-    // QUIRK: Fix instructions having opcode "01".
+    // HACK: Fix instructions having opcode "01".
     if (this.opcode === "" && this.mm.indexOf("0F01") === this.mm.length - 4) {
       this.opcode = "01";
       this.mm = this.mm.substr(0, this.mm.length - 2);
@@ -757,20 +682,19 @@ var X86Inst = Class({
       this.opcodeInt = parseInt(this.opcode, 16);
 
     if (/^\/[0-7]$/.test(this.rm))
-      this.rmInt = parseInt(this.rm.substr(1));
+      this.rmInt = parseInt(this.rm.substr(1), 10);
 
     if (!this.opcode)
-      this.report("'" + this.opcodeString + "' Couldn't parse instruction's opcode.");
-  },
+      this.report(`'${this.opcodeString}' Couldn't parse instruction's opcode`);
+  }
 
-  assignFlags: function(s) {
+  assignFlags(s) {
     // Parse individual flags separated by spaces.
     var flags = s.split(" ");
 
     for (var i = 0; i < flags.length; i++) {
       var flag = flags[i].trim();
-      if (!flag)
-        continue;
+      if (!flag) continue;
 
       var j = flag.indexOf("=");
       if (j !== -1)
@@ -778,9 +702,9 @@ var X86Inst = Class({
       else
         this.assignFlag(flag, true);
     }
-  },
+  }
 
-  assignFlag: function(name, value) {
+  assignFlag(name, value) {
     // Basics.
     if (kCpuArchitecture[name] === true) { this.arch         = name ; return; }
     if (kCpuFeatures[name]     === true) { this.cpu[name]    = true ; return; }
@@ -811,9 +735,9 @@ var X86Inst = Class({
 
       case "PRIVILEGE":
         if (!/^L[0123]$/.test(value))
-          this.report(this.name + ": Invalid privilege level '" + value + "'");
+          this.report(`${this.name}: Invalid privilege level '${value}'`);
 
-        this.privilege = parseInt(value.substr(1));
+        this.privilege = parseInt(value.substr(1), 10);
         return;
 
       case "broadcast":
@@ -829,13 +753,13 @@ var X86Inst = Class({
         break;
     }
 
-    this.report(this.name + ": Unhandled flag " + name + "=" + value);
-  },
+    this.report(`${this.name}: Unhandled flag ${name}=${value}`);
+  }
 
   // Validate the instruction's definition. Common mistakes can be checked and
   // reported easily, however, if the mistake is just an invalid opcode or
   // something else it's impossible to detect.
-  validate: function() {
+  validate() {
     var isValid = true;
     var immCount = this.getImmCount();
 
@@ -850,15 +774,14 @@ var X86Inst = Class({
       // "I" or "II" should be part of the instruction encoding.
       if (this.encoding.indexOf(immEncoding) === -1) {
         isValid = false;
-        this.report("Immediate(s) [" + immCount + "] missing in encoding: " + this.encoding);
+        this.report(`Immediate(s) [${immCount}] missing in encoding: ${this.encoding}`);
       }
 
-      // Every immediate should have it's imm byte ("ib", "iw", "id", or "iq")
-      // in opcode data.
+      // Every immediate should have its imm byte ("ib", "iw", "id", or "iq") in the opcode data.
       m = this.opcodeString.match(/(?:^|\s+)(ib|iw|id|iq)/g);
       if (!m || m.length !== immCount) {
         isValid = false;
-        this.report("Immediate(s) [" + immCount + "] not found in opcode: " + this.opcodeString);
+        this.report(`Immediate(s) [${immCount}] not found in opcode: ${this.opcodeString}`);
       }
     }
 
@@ -866,24 +789,23 @@ var X86Inst = Class({
     // FIXME: Not passing, because Intel Manual sometimes doesn't specify W.
     /*
     if (this.isAVX() && (this.l === "" || this.w === "")) {
-      this.report("AVX instruction should specify L and W fields:" +
-      " L=" + this.l +
-      " W=" + this.w + ".");
+      this.report(`AVX instruction should specify L and W fields: L=${this.l} W=${this.w}`);
     }
     */
 
-    // Verify that if the instruction uses the "VVVV" part of VEX/EVEX prefix
-    // it has the "NDS/NDD/DDS" part of the "VVVV" definition specified and
+    // Verify that if the instruction uses the "VVVV" part of VEX/EVEX prefix,
+    // that it has "NDS/NDD/DDS" part of the "VVVV" definition specified, and
     // that the definition matches the opcode encoding.
 
     return isValid;
-  },
+  }
 
-  report: function(msg) {
-    console.log("[X86Inst:" + this.name + " " + this.operands.join(" ") + "]" + " " + msg);
+  report(msg) {
+    console.log(`[X86Inst:${this.name} ${this.operands.join(" ")}] ${msg}`);
     this.invalid++;
   }
-});
+}
+exports.X86Inst = X86Inst;
 
 // ============================================================================
 // [X86Database]
@@ -891,11 +813,11 @@ var X86Inst = Class({
 
 // X86 instruction database - stores X86Inst instances in a map and aggregates
 // all instructions with the same name.
-var X86Database = Class({
-  $construct: function() {
+class X86Database {
+  constructor() {
     // Instructions in a map, mapping an instruction name into an array of
     // all instructions defined for that name.
-    this.map = {};
+    this.map = Object.create(null);
     this.sortedNames = null;
 
     // Instruction statistics.
@@ -906,9 +828,12 @@ var X86Database = Class({
       xop   : 0, // Number of XOP instructions.
       evex  : 0  // Number of EVEX instructions.
     };
-  },
+  }
 
-  addInstructions: function(instructions) {
+  addInstructions(instructions) {
+    if (instructions === undefined)
+      instructions = x86data.instructions;
+
     for (var i = 0; i < instructions.length; i++) {
       var instData = instructions[i];
       var instNames = instData[kIndexName].split("/");
@@ -926,9 +851,9 @@ var X86Database = Class({
     }
 
     return this;
-  },
+  }
 
-  addInstruction: function(inst) {
+  addInstruction(inst) {
     var group;
 
     if (hasOwn.call(this.map, inst.name)) {
@@ -949,9 +874,9 @@ var X86Database = Class({
     if (inst.prefix === "EVEX") this.stats.evex++;
 
     return this;
-  },
+  }
 
-  getSortedNames: function() {
+  getSortedNames() {
     var map = this.map;
     var names = this.sortedNames;
 
@@ -962,9 +887,9 @@ var X86Database = Class({
     }
 
     return names;
-  },
+  }
 
-  forEachGroup: function(cb, thisArg) {
+  forEachGroup(cb, thisArg) {
     var map = this.map;
     var names = this.getSortedNames();
 
@@ -974,9 +899,9 @@ var X86Database = Class({
     }
 
     return this;
-  },
+  }
 
-  forEachInst: function(cb, thisArg) {
+  forEachInst(cb, thisArg) {
     var map = this.map;
     var names = this.getSortedNames();
 
@@ -990,222 +915,47 @@ var X86Database = Class({
     }
 
     return this;
-  },
+  }
 
-  print: function() {
+  print() {
     this.forEachInst(function(name, inst) {
-      console.log(inst.name + " " + inst.operands.join(", ") + " " + inst.opcodeString + " [" + inst.opcode + "]");
+      console.log(`${inst.name} ${inst.operands.join(", ")} ${inst.opcodeString} [${inst.opcode}]`);
     }, this);
   }
-});
+}
+exports.X86Database = X86Database;
 
 // ============================================================================
-// [X86TableGen]
+// [X86DataCheck]
 // ============================================================================
 
-var Patterns = {
-  "X86Jcc": [{
-    match: [{ signature: "=ANY D:rel8"                        , extract: "mm0=@mm;op0=@opcodeInt;rm0=@rmInt" },
-            { signature: "=ANY D:rel32"                       , extract: "mm1=@mm;op1=@opcodeInt;rm1=@rmInt" }],
-    table: {
-    }
-  }],
+class X86DataCheck {
+  checkVexEvex(db) {
+    const map = db.map;
+    for (var name in map) {
+      const insts = map[name];
+      for (var i = 0; i < insts.length; i++) {
+        const instA = insts[i];
+        for (var j = i + 1; j < insts.length; j++) {
+          const instB = insts[j];
+          if (instA.operands.join("_") === instB.operands.join("_")) {
+            const vex  = instA.prefix === "VEX"  ? instA : instB.prefix === "VEX"  ? instB : null;
+            const evex = instA.prefix === "EVEX" ? instA : instB.prefix === "EVEX" ? instB : null;
 
-  "Mm3dNow": [{
-    match: [{ signature: "=ANY 3DNOW RM:mm,mm/m"              , extract: "mm0=@mm;op0=@opcodeInt;rm0=@rmInt" }],
-    table: {
-    }
-  }]
-};
+            if (vex && evex && vex.opcode === evex.opcode) {
+              // NOTE: There are some false positives, they will be printed as well.
+              var ok = vex.w === evex.w && vex.l === evex.l;
 
-// X86 assembler data generator, used to generate all AsmJit tables which are
-// then injected to some .cpp and .h files.
-var X86TableGen = Class({
-  $construct: function(db, special) {
-    this.db = db;
-  },
-
-  extractTo: function(result, inst, extract) {
-    var arr = extract.split(";");
-    for (var i = 0; i < arr.length; i++) {
-      var data = arr[i].trim();
-      if (!data) continue;
-
-      var parts = data.split("=");
-      if (parts.length !== 2)
-        throw new Error("Extraction failed: Invalid extract data '" + data + "'");
-
-      var key = parts[0];
-      var val = (new Function("return " + parts[1].replace(/\@/g, "this."))).call(inst);
-      
-      if (hasOwn.call(result, key) && result[key] !== val)
-        throw new Error("Extraction failed: Key '" + key + "' already contains '" + result[key] + "', which doesn't match '" + val + "'");
-
-      result[key] = val;
-    }
-  },
-
-  matchInternal: function(encType, instList, patternList) {
-    for (var j = 0; j < patternList.length; j++) {
-      var pattern = patternList[j];
-      var result = { enc: encType };
-      var nMatches = 0;
-
-      var match = pattern.match;
-      var matched = false;
-
-      for (var a = 0; a < match.length; a++) {
-        var signature = match[a].signature;
-        var command = signature.charAt(0);
-
-        signature = signature.substr(1);
-
-        for (var i = 0; i < instList.length; i++) {
-          var inst = instList[i];
-          if (inst.getSignature() === signature) {
-            this.extractTo(result, inst, match[a].extract);
-            matched = true;
-            nMatches++;
-            break;
+              if (!ok) {
+                console.log(`Instruction ${name} differs:`);
+                console.log(`  ${vex.operands.join(" ")}: ${vex.opcodeString}`);
+                console.log(`  ${evex.operands.join(" ")}: ${evex.opcodeString}`);
+              }
+            }
           }
         }
-
-        if (!matched && command === "=")
-          return null;
       }
     }
-
-    if (nMatches !== instList.length)
-      return null;
-
-    return result;
-  },
-  
-  match: function(instList) {
-    for (var encType in Patterns) {
-      var patternList = Patterns[encType];
-      var result = this.matchInternal(encType, instList, patternList);
-
-      if (result) {
-        console.log(JSON.stringify(result));
-        return result;
-      }
-    }
-
-    return null;
-  },
-
-  generate: function() {
-    var unmatched = [];
-
-    this.db.forEachGroup(function(name, instList) {
-      var result = this.match(instList);
-      if (result) {
-      }
-      else {
-        unmatched.push(instList);
-      }
-    }, this);
-
-    var opMap = {};
-    var snMap = {};
-    
-    unmatched.forEach(function(instList) {
-      var signList = [];
-      var name = instList[0].name;
-
-      for (var i = 0; i < instList.length; i++) {
-        var inst = instList[i];
-        var sign = inst.getSignature();
-
-        if (!hasOwn.call(opMap, sign)) {
-          opMap[sign] = [];
-        }
-        opMap[sign].push(name);
-
-        signList.push({
-          inst: inst,
-          sign: sign
-        });
-      }
-
-      signList.sort(function(a, b) {
-        return Utils.strcmp(a.sign, b.sign);
-      });
-
-      var g = "";
-      var gMap = {};
-
-      for (var i = 0; i < signList.length; i++) {
-        var sign = signList[i].sign;
-        sign = "<" + sign + ">";
-
-        if (hasOwn.call(gMap, sign))
-          continue;
-
-        g += sign;
-        gMap[sign] = true;
-      }
-
-      if (!hasOwn.call(snMap, g)) {
-        snMap[g] = [];
-      }
-      snMap[g].push(name);
-    }, this);
-
-    var opMapKeys = Object.keys(opMap);
-    var snMapKeys = Object.keys(snMap);
-
-    opMapKeys.sort();
-    snMapKeys.sort();
-
-    console.log("INSTRUCTIONS [" + snMapKeys.length + "]:");
-    for (var i = 0; i < snMapKeys.length; i++) {
-      var k = snMapKeys[i];
-
-      console.log("  " + snMap[k].join(" ") + ":");
-      var s = k.split("><");
-      s[0] = s[0].substr(1);
-      s[s.length - 1] = s[s.length - 1].substr(0, s[s.length - 1].length - 1);
-
-      // console.log("  " + k);
-      for (var j = 0; j < s.length; j++)
-        console.log('  { signature: ' + Utils.padRight(JSON.stringify(s[j]), 36) + ', extract: "op0=@opcodeInt;rm0=@rmValue" },');
-
-      console.log("");
-    }
-/*
-    for (var i = 0; i < snMapKeys.length; i++) {
-      var k = snMapKeys[i];
-      console.log("  " + k);
-      console.log("  " + snMap[k].join(" "));
-      console.log("");
-    }
-
-    console.log("OPERANDS [" + opMapKeys.length + "]:");
-    for (var i = 0; i < opMapKeys.length; i++) {
-      var k = opMapKeys[i];
-      console.log("  " + k);
-      console.log("  " + opMap[k].join(" "));
-      console.log("");
-    }
-
-    console.log("");
-    console.log("===========================================================");
-    console.log("");
-*/
   }
-});
-
-// ============================================================================
-// [main]
-// ============================================================================
-
-function main(x86db) {
-  var db = new X86Database().addInstructions(x86db.instructions);
-  var tg = new X86TableGen(db);
-
-  tg.generate();
 }
-
-main(x86db);
+exports.X86DataCheck = X86DataCheck;
