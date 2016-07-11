@@ -1,0 +1,30 @@
+{
+  "name": "asmdb",
+  "version": "0.0.1",
+  "license": "Unlicense",
+  "engines": { "node": ">=4" },
+
+  "description": "X86/X64 instruction database and utilities.",
+  "keywords": [
+    "asm",
+    "assembler",
+    "x86",
+    "x64"
+  ],
+
+  "homepage": "https://github.com/kobalicek/asmdb",
+  "bugs": {
+    "url": "https://github.com/kobalicek/asmdb/issues"
+  },
+
+  "contributors": [
+    "Petr Kobalicek <kobalicek.petr@gmail.com> (kobalicek.com)"
+  ],
+
+  "main": "index.js",
+
+  "repository" : {
+    "type": "git",
+    "url": "https://github.com/kobalicek/asmdb.git"
+  }
+}
