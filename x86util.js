@@ -138,7 +138,7 @@ class X86Util {
   //
   // Handles "ib", "iw", "id", "iq", and also "/is4".
   static immSize(s) {
-    if (s === "1" ) return 0;
+    if (s === "1" ) return 8;
     if (s === "i4" || s === "/is4") return 4;
     if (s === "ib") return 8;
     if (s === "iw") return 16;
@@ -181,6 +181,7 @@ class X86Operand {
     this.bcstSize = -1;     // AVX-512 broadcast size.
 
     this.imm = 0;           // Immediate operand's size.
+    this.immValue = null;   // Immediate value - `null` or `1` (only used by shift/rotate instructions).
     this.rel = 0;           // Relative displacement operand's size.
 
     this.implicit = false;  // True if the operand is an implicit register (not encoded in binary).
@@ -271,8 +272,10 @@ class X86Operand {
 
       if (X86Util.isImmOp(op)) {
         this.imm = X86Util.immSize(op);
-        if (op === "1")
+        if (op === "1") {
           this.implicit = true;
+          this.immValue = 1;
+        }
         continue;
       }
 
@@ -325,36 +328,46 @@ class X86Instruction {
     this.arch = "ANY";      // Architecture - ANY, X86, X64.
     this.encoding = "";     // Instruction encoding.
     this.prefix = "";       // Prefix - "", "3DNOW", "EVEX", "VEX", "XOP".
+
     this.opcode = "";       // A single opcode byte as a hex string, "00-FF".
     this.opcodeInt = 0;     // A single opcode byte as an integer (0..255).
     this.opcodeString = ""; // The whole opcode string, as specified in manual.
+
     this.l = "";            // Opcode L field (nothing, 128, 256, 512).
     this.w = "";            // Opcode W field.
     this.pp = "";           // Opcode PP part.
     this.mm = "";           // Opcode MM[MMM] part.
     this.vvvv = "";         // Opcode VVVV part.
     this._67h = false;      // Instruction requires a size override prefix.
+
     this.rm = "";           // Instruction specific payload "/0..7".
     this.rmInt = -1;        // Instruction specific payload as integer (0-7).
     this.ri = false;        // Instruction opcode is combined with register, "XX+r" or "XX+i".
     this.rel = 0;           // Displacement (cb cw cd parts).
+
     this.implicit = false;  // Uses implicit operands (registers / memory).
     this.lock = false;      // Can be used with LOCK prefix.
     this.rep = false;       // Can be used with REP prefix.
     this.xcr = "";          // Reads or writes to/from XCR register.
+
     this.volatile = false;  // Volatile instruction hint for the instruction scheduler.
     this.privilege = 3;     // Privilege level required to execute the instruction.
+
+    this.fpuTop = 0;        // FPU top index manipulation [-1, 0, 1, 2].
     this.fpu = false;       // If the instruction is an FPU instruction.
     this.mmx = false;       // If the instruction is an MMX instruction.
-    this.fpuTop = 0;        // FPU top index manipulation [-1, 0, 1, 2].
+
     this.vsibReg = "";      // AVX VSIB register type (xmm/ymm/zmm).
     this.vsibSize = -1;     // AVX VSIB register size (32/64).
+
     this.broadcast = false; // AVX-512 broadcast support.
     this.bcstSize = -1;     // AVX-512 broadcast size.
+
     this.kmask = false;     // AVX-512 merging {k}.
     this.zmask = false;     // AVX-512 zeroing {kz}, implies {k}.
     this.sae = false;       // AVX-512 suppress all exceptions {sae} support.
     this.rnd = false;       // AVX-512 embedded rounding {er}, implies {sae}.
+
     this.elementSize = -1;  // Instruction's element size.
     this.invalid = 0;       // Number of problems detected by X86DataBase.
     this.cpu = dict();      // CPU features required to execute the instruction.

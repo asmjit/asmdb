@@ -175,6 +175,7 @@ The stringified instruction would print something like this (with added comments
     "vsibSize": -1,                // AVX VSIB register size (32/64).
     "bcstSize": -1,                // AVX-512 broadcast size.
     "imm": 0,                      // Immediate operand's size.
+    "immValue": null,              // Immediate value - `null` or `1` (only used by shift/rotate instructions).
     "rel": 0,                      // Relative displacement operand's size.
     "implicit": false,             // True if the operand is an implicit register (not encoded in binary).
     "read": false,                 // True if the operand is a read-op (R or X) from reg/mem.
@@ -193,6 +194,7 @@ The stringified instruction would print something like this (with added comments
     "vsibSize": -1,
     "bcstSize": -1,
     "imm": 0,
+    "immValue": null,
     "rel": 0,
     "implicit": false,
     "read": true,
@@ -211,6 +213,7 @@ The stringified instruction would print something like this (with added comments
     "vsibSize": -1,
     "bcstSize": -1,
     "imm": 0,
+    "immValue": null,
     "rel": 0,
     "implicit": false,
     "read": true,
