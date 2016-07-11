@@ -109,6 +109,7 @@ const kCpuRegs = Utils.buildCpuRegs({
   "sreg": ["sreg" , "cs", "ds", "es", "fs", "gs", "ss"],
   "creg": ["creg" , "cr0-8"  ],
   "dreg": ["dreg" , "dr0-7"  ],
+  "bnd" : ["bnd"  , "bnd0-3" ],
   "st"  : ["st(0)", "st(i)"  ],
   "mm"  : ["mm"   , "mm0-7"  ],
   "k"   : ["k"    , "k0-7"   ],
@@ -144,7 +145,7 @@ class X86Util {
   // Get whether the string `s` describes a memory operand.
   static isMemOp(s) { return s && /^(?:mem|mxx|(?:m(?:off)?\d+(?:dec|bcd|fp|int)?)|(?:vm\d+(?:x|y|z)))$/.test(s); }
   // Get whether the string `s` describes an immediate operand.
-  static isImmOp(s) { return s && /^(?:1|ib|iw|id|iq)$/.test(s); }
+  static isImmOp(s) { return s && /^(?:1|i4|ib|iw|id|iq)$/.test(s); }
   // Get whether the string `s` describes a relative displacement (label).
   static isRelOp(s) { return s && /^rel\d+$/.test(s); }
   // Get a register class based on string `s`, or `null` if `s` is not a register.
@@ -155,10 +156,11 @@ class X86Util {
   // Handles "ib", "iw", "id", "iq", and also "/is4".
   static immSize(s) {
     if (s === "1" ) return 0;
-    if (s === "ib" || s === "/is4") return 1;
-    if (s === "iw") return 2;
-    if (s === "id") return 4;
-    if (s === "iq") return 8;
+    if (s === "i4" || s === "/is4") return 4;
+    if (s === "ib") return 8;
+    if (s === "iw") return 16;
+    if (s === "id") return 32;
+    if (s === "iq") return 64;
 
     return -1;
   }
@@ -167,8 +169,8 @@ class X86Util {
   //
   // Handles "rel8" and "rel32".
   static relSize(s) {
-    if (s === "rel8") return 1;
-    if (s === "rel32") return 4;
+    if (s === "rel8") return 8;
+    if (s === "rel32") return 32;
 
     return -1;
   }
@@ -498,7 +500,7 @@ class X86Inst {
       // Propagate VSIB.
       if (operand.vsibReg) {
         if (this.vsibReg) {
-          this.report("Only one operand can be vector memory address (vmNNx)");
+          this.report("Only one operand can be a vector memory address (vmNNx)");
         }
 
         this.vsibReg = operand.vsibReg;
