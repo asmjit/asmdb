@@ -79,7 +79,10 @@
 // [ ] VMX/SVM extensions
 // [ ] TSX extensions
 
-module.exports = {
+(function($export, $as) {
+"use strict";
+
+$export[$as] = {
   architectures: [
     "ANY",
     "X86",
@@ -3955,3 +3958,6 @@ module.exports = {
     ["vxorps"           , "W:zmm {kz}, zmm, zmm/m512/b32"            , "RVM"  , "EVEX.NDS.512.0F.W0 57 /r"         , "ANY AVX512DQ"]
   ]
 };
+
+}).apply(this, typeof module === "object" && module && module.exports
+  ? [module, "exports"] : [this.asmdb || (this.asmdb = {}), "x86data"]);

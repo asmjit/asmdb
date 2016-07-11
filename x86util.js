@@ -1,13 +1,14 @@
 // [x86util.js]
 // X86/X64 instruction-set utilities that use `x86data.js`.
 
+(function($export, $as) {
 "use strict";
-const x86data = require("./x86data.js");
+
+const x86data = $export.x86data ? $export.x86data : require("./x86data.js");
 const hasOwn = Object.prototype.hasOwnProperty;
 
-function dict() {
-  return Object.create(null);
-}
+// Creates an Object without a prototype (used as a map).
+function dict() { return Object.create(null); }
 
 // ============================================================================
 // [Utils]
@@ -21,34 +22,16 @@ class Utils {
   // Uppercase the first character of a string `s` and return a new string.
   static upFirst(s) { return s ? s.charAt(0).toUpperCase() + s.substr(1) : ""; }
 
-  // Repeat a string `s` by `n` times.
-  static repeat(s, n) {
-    var out = "";
-    for (var i = 0; i < n; i++) out += s;
-    return out;
-  }
-
   // Pad `s` left with spaces so the resulting string has `n` characters total.
-  static padLeft(s, n) { return Utils.repeat(" ", Math.max(n - s.length, 0)) + s; }
+  static padLeft(s, n) { return " ".repeat(Math.max(n - s.length, 0)) + s; }
   // Pad `s` right with spaces so the resulting string has `n` characters total.
-  static padRight(s, n) { return s + Utils.repeat(" ", Math.max(n - s.length, 0)); }
+  static padRight(s, n) { return s + " ".repeat(Math.max(n - s.length, 0)); }
 
   static mapFromArray(arr) {
-    var map = dict();
+    const map = dict();
     for (var i = 0; i < arr.length; i++)
       map[arr[i]] = true;
     return map;
-  }
-
-  // Inject `data` to the string `s` replacing the content from `start` to `end`.
-  static inject(s, start, end, data) {
-    var iStart = s.indexOf(start);
-    var iEnd   = s.indexOf(end);
-
-    if (iStart === -1) throw new Error("Couldn't locate start mark.");
-    if (iEnd   === -1) throw new Error("Couldn't locate end mark.");
-
-    return s.substr(0, iStart + start.length) + data + s.substr(iEnd);
   }
 
   // Build an object containing CPU registers as keys mapping them to a registers' group.
@@ -188,11 +171,11 @@ class X86Operand {
 
     this.reg = "";          // Register operand's definition.
     this.regClass = "";     // Register operand's class.
-    this.regMem = "";       // Segment specified with register that is used to perform a memory IO.
 
     this.mem = "";          // Memory operand's definition.
     this.memSize = -1;      // Memory operand's size.
     this.memOff = false;    // Memory operand is an absolute offset (only a specific version of MOV).
+    this.memSeg = "";       // Segment specified with register that is used to perform a memory IO.
     this.vsibReg = "";      // AVX VSIB register type (xmm/ymm/zmm).
     this.vsibSize = -1;     // AVX VSIB register size (32/64).
     this.bcstSize = -1;     // AVX-512 broadcast size.
@@ -200,19 +183,19 @@ class X86Operand {
     this.imm = 0;           // Immediate operand's size.
     this.rel = 0;           // Relative displacement operand's size.
 
-    this.implicit = false;  // True if the operand is an implicit register (i.e. not encoded in binary).
-    this.read = false;      // True if the operand is a read (R or X) from reg/mem.
-    this.write = false;     // True if the operand is a write (W or X) to reg/mem.
-    this.rwxIndex = -1;     // Operation (RWX) index.
-    this.rwxWidth = -1;     // Operation (RWX) width.
+    this.implicit = false;  // True if the operand is an implicit register (not encoded in binary).
+    this.read = false;      // True if the operand is a read-op (R or X) from reg/mem.
+    this.write = false;     // True if the operand is a write-op (W or X) to reg/mem.
+    this.rwxIndex = -1;     // Read/Write (RWX) index.
+    this.rwxWidth = -1;     // Read/Write (RWX) width.
 
     // Handle RWX decorators prefix in "R|W|X[A:B]:" format.
     var m = /^(R|W|X)(\[(\d+)\:(\d+)\])?\:/.exec(data);
     if (m) {
-      // RWX.
+      // RWX:
       this.setAccess(m[1]);
 
-      // RWX Index/Width.
+      // RWX[A:B]:
       if (m.length > 2) {
         var a = parseInt(m[2], 10);
         var b = parseInt(m[3], 10);
@@ -221,7 +204,7 @@ class X86Operand {
         this.rwxWidth = Math.abs(a - b) + 1;
       }
 
-      // Remove RWX information from the operand's definition.
+      // Remove RWX information from the operand's string.
       data = data.substr(m[0].length);
     }
     else {
@@ -254,10 +237,10 @@ class X86Operand {
     for (var i = 0; i < ops.length; i++) {
       var op = ops[i].trim();
 
-      // Handle segment specification if this is an implicit register performing
-      // a memory access.
+      // Handle a segment specification if this is an implicit register performing
+      // memory access.
       if (/^(?:ds|es)\:/.test(op)) {
-        this.regMem = op.substr(0, 2);
+        this.memSeg = op.substr(0, 2);
         op = op.substr(3);
       }
 
@@ -332,20 +315,19 @@ class X86Operand {
 exports.X86Operand = X86Operand;
 
 // ============================================================================
-// [X86Inst]
+// [X86Instruction]
 // ============================================================================
 
 // X86/X64 instruction.
-class X86Inst {
+class X86Instruction {
   constructor(name, operands, encoding, opcode, flags) {
     this.name = name;       // Instruction name.
     this.arch = "ANY";      // Architecture - ANY, X86, X64.
-
+    this.encoding = "";     // Instruction encoding.
     this.prefix = "";       // Prefix - "", "3DNOW", "EVEX", "VEX", "XOP".
     this.opcode = "";       // A single opcode byte as a hex string, "00-FF".
     this.opcodeInt = 0;     // A single opcode byte as an integer (0..255).
     this.opcodeString = ""; // The whole opcode string, as specified in manual.
-
     this.l = "";            // Opcode L field (nothing, 128, 256, 512).
     this.w = "";            // Opcode W field.
     this.pp = "";           // Opcode PP part.
@@ -355,46 +337,29 @@ class X86Inst {
     this.rm = "";           // Instruction specific payload "/0..7".
     this.rmInt = -1;        // Instruction specific payload as integer (0-7).
     this.ri = false;        // Instruction opcode is combined with register, "XX+r" or "XX+i".
-    this.rel = 0;           // Opcode displacement (cb cw cd parts).
-
-    // Encoding & operands.
-    this.encoding = "";     // Opcode encoding.
-    this.operands = [];     // Instruction operands array.
-    this.implicit = false;  // Instruction uses implicit operands (registers / memory).
-
-    // Metadata.
+    this.rel = 0;           // Displacement (cb cw cd parts).
+    this.implicit = false;  // Uses implicit operands (registers / memory).
     this.lock = false;      // Can be used with LOCK prefix.
     this.rep = false;       // Can be used with REP prefix.
     this.xcr = "";          // Reads or writes to/from XCR register.
-    this.cpu = dict();      // CPU features required to execute the instruction.
-    this.eflags = dict();   // CPU flags read/written/zeroed/set/undefined.
-
     this.volatile = false;  // Volatile instruction hint for the instruction scheduler.
     this.privilege = 3;     // Privilege level required to execute the instruction.
-
-    this.fpu = false;       // Whether the instruction is a FPU instruction.
-    this.mmx = false;       // Whether the instruction is a MMX instruction.
+    this.fpu = false;       // If the instruction is an FPU instruction.
+    this.mmx = false;       // If the instruction is an MMX instruction.
     this.fpuTop = 0;        // FPU top index manipulation [-1, 0, 1, 2].
-
     this.vsibReg = "";      // AVX VSIB register type (xmm/ymm/zmm).
     this.vsibSize = -1;     // AVX VSIB register size (32/64).
-
     this.broadcast = false; // AVX-512 broadcast support.
     this.bcstSize = -1;     // AVX-512 broadcast size.
     this.kmask = false;     // AVX-512 merging {k}.
     this.zmask = false;     // AVX-512 zeroing {kz}, implies {k}.
-    this.sae = false;       // AVX-512 suppress all exceptions {sae}.
+    this.sae = false;       // AVX-512 suppress all exceptions {sae} support.
     this.rnd = false;       // AVX-512 embedded rounding {er}, implies {sae}.
-
-    // Instruction element size, used by broadcast, but also defined for all
-    // instructions that don't do broadcast. If the element size is ambiguous
-    // (e.g. the instruction converts from one size to another) it contains
-    // the source operand size, as source is used in memory broadcasts.
-    this.elementSize = -1;
-
-    // Every call to report increments invalid counter. Nonzero counter will
-    // prevent generating instruction tables for AsmJit.
-    this.invalid = 0;
+    this.elementSize = -1;  // Instruction's element size.
+    this.invalid = 0;       // Number of problems detected by X86DataBase.
+    this.cpu = dict();      // CPU features required to execute the instruction.
+    this.eflags = dict();   // CPU flags read/written/zeroed/set/undefined.
+    this.operands = [];     // Instruction operands array.
 
     this.assignOperands(operands);
     this.assignEncoding(encoding);
@@ -415,7 +380,7 @@ class X86Inst {
     return -1;
   }
 
-  // Get signature of the instruction in form "ARCH PREFIX ENCODING[:operands]"
+  // Get signature of the instruction in an "ARCH PREFIX ENCODING[:operands]" form.
   getSignature() {
     var operands = this.operands;
     var sign = this.arch;
@@ -519,14 +484,15 @@ class X86Inst {
     this.opcodeString = s;
 
     var parts = s.split(" ");
+    var prefix, comp;
     var i;
 
     if (/^(EVEX|VEX|XOP)\./.test(s)) {
       // Parse VEX and EVEX encoded instruction.
-      var prefix = parts[0].split(".");
+      prefix = parts[0].split(".");
 
       for (i = 0; i < prefix.length; i++) {
-        var comp = prefix[i];
+        comp = prefix[i];
 
         // Process "EVEX", "VEX", and "XOP" prefixes.
         if (/^(?:EVEX|VEX|XOP)$/.test(comp)) { this.prefix = comp; continue; }
@@ -554,7 +520,7 @@ class X86Inst {
       }
 
       for (i = 1; i < parts.length; i++) {
-        var comp = parts[i];
+        comp = parts[i];
 
         // Parse opcode.
         if (/^[0-9A-Fa-f]{2}$/.test(comp)) {
@@ -580,7 +546,7 @@ class X86Inst {
     else {
       // Parse X86/X64 instruction (including legacy MMX/SSE/3DNOW instructions).
       for (i = 0; i < parts.length; i++) {
-        var comp = parts[i];
+        comp = parts[i];
 
         // Parse REX.W prefix.
         if (comp === "REX.W") {
@@ -771,7 +737,7 @@ class X86Inst {
     // encoding and opcode field. Basically if there is an "ix" in operands,
     // the encoding should contain "I".
     if (immCount > 0) {
-      var immEncoding = Utils.repeat("I", immCount);
+      var immEncoding = "I".repeat(immCount);
 
       // "I" or "II" should be part of the instruction encoding.
       if (this.encoding.indexOf(immEncoding) === -1) {
@@ -803,45 +769,47 @@ class X86Inst {
   }
 
   report(msg) {
-    console.log(`[X86Inst:${this.name} ${this.operands.join(" ")}] ${msg}`);
+    console.log(`[X86Instruction:${this.name} ${this.operands.join(" ")}] ${msg}`);
     this.invalid++;
   }
 }
-exports.X86Inst = X86Inst;
+exports.X86Instruction = X86Instruction;
 
 // ============================================================================
-// [X86Database]
+// [X86DataBase]
 // ============================================================================
 
-// X86 instruction database - stores X86Inst instances in a map and aggregates
-// all instructions with the same name.
-class X86Database {
+// X86 instruction database - stores X86Instruction instances in a map and
+// aggregates all instructions with the same name.
+class X86DataBase {
   constructor() {
-    // Instructions in a map, mapping an instruction name into an array of
-    // all instructions defined for that name.
+    // Instructions in a map, mapping an instruction name into an array of all
+    // instructions defined for that name.
     this.map = Object.create(null);
-    this.sortedNames = null;
+    this.instructionNames = null;
 
     // Instruction statistics.
     this.stats = {
       insts : 0, // Number of all instructions.
       groups: 0, // Number of grouped instructions (having unique name).
-      avx   : 0, // Number of AVX instructions.
+      vex   : 0, // Number of VEX instructions.
       xop   : 0, // Number of XOP instructions.
       evex  : 0  // Number of EVEX instructions.
     };
   }
 
-  addInstructions(instructions) {
-    if (instructions === undefined)
-      instructions = x86data.instructions;
+  addDefault() {
+    this.addInstructions(x86data.instructions);
+    return this;
+  }
 
+  addInstructions(instructions) {
     for (var i = 0; i < instructions.length; i++) {
-      var instData = instructions[i];
-      var instNames = instData[kIndexName].split("/");
+      const instData = instructions[i];
+      const instNames = instData[kIndexName].split("/");
 
       for (var j = 0; j < instNames.length; j++) {
-        var instObj = new X86Inst(
+        const instObj = new X86Instruction(
           instNames[j],
           instData[kIndexOperands],
           instData[kIndexEncoding],
@@ -863,69 +831,72 @@ class X86Database {
     }
     else {
       group = this.map[inst.name] = [];
-      this.sortedNames = null;
+      this.instructionNames = null;
       this.stats.groups++;
     }
 
     group.push(inst);
     this.stats.insts++;
 
-    // Misc stats.
-    if (inst.prefix === "VEX" ) this.stats.avx++;
+    // Misc statistics.
+    if (inst.prefix === "VEX" ) this.stats.vex++;
     if (inst.prefix === "XOP" ) this.stats.xop++;
     if (inst.prefix === "EVEX") this.stats.evex++;
 
     return this;
   }
 
-  getSortedNames() {
-    var map = this.map;
-    var names = this.sortedNames;
+  getGroup(name) {
+    return this.map[name] || null;
+  }
 
+  getInstructionNames() {
+    const map = this.map;
+
+    var names = this.instructionNames;
     if (names === null) {
       names = Object.keys(map);
       names.sort();
-      this.sortedNames = names;
+      this.instructionNames = names;
     }
 
     return names;
   }
 
-  forEachGroup(cb, thisArg) {
-    var map = this.map;
-    var names = this.getSortedNames();
+  forEach(cb, thisArg) {
+    const map = this.map;
+    const names = this.getInstructionNames();
 
     for (var i = 0; i < names.length; i++) {
-      var name = names[i];
+      const name = names[i];
+      const list = map[name];
+
+      for (var j = 0; j < list.length; j++)
+        cb.call(thisArg, name, list[j]);
+    }
+
+    return this;
+  }
+
+  forEachGroup(cb, thisArg) {
+    const map = this.map;
+    const names = this.getInstructionNames();
+
+    for (var i = 0; i < names.length; i++) {
+      const name = names[i];
       cb.call(thisArg, name, map[name]);
     }
 
     return this;
   }
 
-  forEachInst(cb, thisArg) {
-    var map = this.map;
-    var names = this.getSortedNames();
-
-    for (var i = 0; i < names.length; i++) {
-      var name = names[i];
-      var list = map[name];
-
-      for (var j = 0; j < list.length; j++) {
-        cb.call(thisArg, name, list[j]);
-      }
-    }
-
-    return this;
-  }
-
   print() {
-    this.forEachInst(function(name, inst) {
+    this.forEach(function(name, inst) {
       console.log(`${inst.name} ${inst.operands.join(", ")} ${inst.opcodeString} [${inst.opcode}]`);
     }, this);
   }
 }
-exports.X86Database = X86Database;
+exports.X86DataBase = X86DataBase;
 
 // ============================================================================
 // [X86DataCheck]
@@ -961,3 +932,6 @@ class X86DataCheck {
   }
 }
 exports.X86DataCheck = X86DataCheck;
+
+}).apply(this, typeof module === "object" && module && module.exports
+  ? [module, "exports"] : [this.asmdb || (this.asmdb = {}), "x86util"]);
