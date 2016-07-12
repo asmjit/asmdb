@@ -184,11 +184,11 @@ class X86Operand {
     this.immValue = null;   // Immediate value - `null` or `1` (only used by shift/rotate instructions).
     this.rel = 0;           // Relative displacement operand's size.
 
-    this.implicit = false;  // True if the operand is an implicit register (not encoded in binary).
     this.read = false;      // True if the operand is a read-op (R or X) from reg/mem.
     this.write = false;     // True if the operand is a write-op (W or X) to reg/mem.
     this.rwxIndex = -1;     // Read/Write (RWX) index.
     this.rwxWidth = -1;     // Read/Write (RWX) width.
+    this.implicit = false;  // True if the operand is an implicit register (not encoded in binary).
 
     // Handle RWX decorators prefix in "R|W|X[A:B]:" format.
     var m = /^(R|W|X)(\[(\d+)\:(\d+)\])?\:/.exec(data);

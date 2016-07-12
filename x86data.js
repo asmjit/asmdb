@@ -274,7 +274,7 @@ $export[$as] = {
     ["bts"              , "r32/m32, ib"                              , "MI"   , "0F BA /5 ib"                      , "ANY LOCK OF=U SF=U AF=U PF=U CF=W"],
     ["bts"              , "r64/m64, ib"                              , "MI"   , "REX.W 0F BA /5 ib"                , "X64 LOCK OF=U SF=U AF=U PF=U CF=W"],
 
-    ["call"             , "rel32"                                    , "M"    , "E8 cd"                            , "ANY VOLATILE OF=U SF=U ZF=U AF=U PF=U CF=U"],
+    ["call"             , "rel32"                                    , "D"    , "E8 cd"                            , "ANY VOLATILE OF=U SF=U ZF=U AF=U PF=U CF=U"],
     ["call"             , "R:r32/m32"                                , "M"    , "FF /2"                            , "X86 VOLATILE OF=U SF=U ZF=U AF=U PF=U CF=U"],
     ["call"             , "R:r64/m64"                                , "M"    , "FF /2"                            , "X64 VOLATILE OF=U SF=U ZF=U AF=U PF=U CF=U"],
 
