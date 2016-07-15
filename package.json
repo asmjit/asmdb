@@ -1,6 +1,6 @@
 {
   "name": "asmdb",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "Unlicense",
   "engines": { "node": ">=4" },
 
@@ -12,9 +12,9 @@
     "x64"
   ],
 
-  "homepage": "https://github.com/kobalicek/asmdb",
+  "homepage": "https://github.com/asmjit/asmdb",
   "bugs": {
-    "url": "https://github.com/kobalicek/asmdb/issues"
+    "url": "https://github.com/asmjit/asmdb/issues"
   },
 
   "contributors": [
@@ -25,6 +25,6 @@
 
   "repository" : {
     "type": "git",
-    "url": "https://github.com/kobalicek/asmdb.git"
+    "url": "https://github.com/asmjit/asmdb.git"
   }
 }

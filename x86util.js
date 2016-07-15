@@ -126,7 +126,7 @@ class X86Util {
   // Get whether the string `s` describes a register operand.
   static isRegOp(s) { return s && hasOwn.call(kCpuRegs, s); }
   // Get whether the string `s` describes a memory operand.
-  static isMemOp(s) { return s && /^(?:mem|mxx|(?:m(?:off)?\d+(?:dec|bcd|fp|int)?)|(?:vm\d+(?:x|y|z)))$/.test(s); }
+  static isMemOp(s) { return s && /^(?:mem|mib|(?:m(?:off)?\d+(?:dec|bcd|fp|int)?)|(?:vm\d+(?:x|y|z)))$/.test(s); }
   // Get whether the string `s` describes an immediate operand.
   static isImmOp(s) { return s && /^(?:1|i4|ib|iw|id|iq)$/.test(s); }
   // Get whether the string `s` describes a relative displacement (label).

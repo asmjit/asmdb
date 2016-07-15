@@ -1283,11 +1283,11 @@ $export[$as] = {
     ["bndcn"            , "R:bnd, r64/m64"                           , "RM"   , "F2 0F 1B /r"                      , "X64 VOLATILE MPX"],
     ["bndcu"            , "R:bnd, r32/m32"                           , "RM"   , "F2 0F 1A /r"                      , "X86 VOLATILE MPX"],
     ["bndcu"            , "R:bnd, r64/m64"                           , "RM"   , "F2 0F 1A /r"                      , "X64 VOLATILE MPX"],
-    ["bndldx"           , "W:bnd, mem"                               , "RM"   , "0F 1A /r"                         , "ANY VOLATILE MPX"],
+    ["bndldx"           , "W:bnd, mib"                               , "RM"   , "0F 1A /r"                         , "ANY VOLATILE MPX"],
     ["bndmk"            , "W:bnd, mem"                               , "RM"   , "F3 0F 1B /r"                      , "ANY VOLATILE MPX"],
     ["bndmov"           , "W:bnd, bnd/mem"                           , "RM"   , "66 0F 1A /r"                      , "ANY VOLATILE MPX"],
     ["bndmov"           , "W:bnd/mem, bnd"                           , "MR"   , "66 0F 1B /r"                      , "ANY VOLATILE MPX"],
-    ["bndstx"           , "W:mem, bnd"                               , "MR"   , "0F 1B /r"                         , "ANY VOLATILE MPX"],
+    ["bndstx"           , "W:mib, bnd"                               , "MR"   , "0F 1B /r"                         , "ANY VOLATILE MPX"],
 
     // MMX & SSE.
     ["addpd"            , "X:xmm, xmm/m128"                          , "RM"   , "66 0F 58 /r"                      , "ANY SSE2"],
@@ -1695,6 +1695,10 @@ $export[$as] = {
     ["unpcklps"         , "X:xmm, xmm/m128"                          , "RM"   , "0F 14 /r"                         , "ANY SSE"],
     ["xorpd"            , "X:xmm, xmm/m128"                          , "RM"   , "66 0F 57 /r"                      , "ANY SSE2"],
     ["xorps"            , "X:xmm, xmm/m128"                          , "RM"   , "0F 57 /r"                         , "ANY SSE"],
+
+    // MMX & SSE (Aliases).
+    ["movq"             , "W:xmm, mm"                                , "RM"   , "F3 0F D6 /r"                      , "ANY SSE2"],
+    ["movq"             , "W[7:0]:mm, xmm"                           , "RM"   , "F2 0F D6 /r"                      , "ANY SSE2"],
 
     // 3DNOW.
     ["femms"            , ""                                         , "NONE" , "0F 0E"                            , "ANY VOLATILE 3DNOW"],
