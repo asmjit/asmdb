@@ -327,6 +327,7 @@ class X86Instruction {
     this.name = name;       // Instruction name.
     this.arch = "ANY";      // Architecture - ANY, X86, X64.
     this.encoding = "";     // Instruction encoding.
+
     this.prefix = "";       // Prefix - "", "3DNOW", "EVEX", "VEX", "XOP".
 
     this.opcode = "";       // A single opcode byte as a hex string, "00-FF".
@@ -368,6 +369,7 @@ class X86Instruction {
     this.sae = false;       // AVX-512 suppress all exceptions {sae} support.
     this.rnd = false;       // AVX-512 embedded rounding {er}, implies {sae}.
 
+    this.tupleType = "";    // AVX-512 tuple-type.
     this.elementSize = -1;  // Instruction's element size.
     this.invalid = 0;       // Number of problems detected by X86DataBase.
     this.cpu = dict();      // CPU features required to execute the instruction.
@@ -490,6 +492,13 @@ class X86Instruction {
   }
 
   assignEncoding(s) {
+    // Parse 'TUPLE-TYPE' as defined by AVX-512.
+    var i = s.indexOf("-");
+    if (i !== -1) {
+      this.tupleType = s.substr(i + 1);
+      s = s.substr(0, i);
+    }
+
     this.encoding = s;
   }
 

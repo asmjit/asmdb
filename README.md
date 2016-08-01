@@ -150,6 +150,7 @@ The stringified instruction would print something like this (with added comments
   "zmask": false,                  // AVX-512 zeroing {kz}, implies {k}.
   "sae": false,                    // AVX-512 suppress all exceptions {sae} support.
   "rnd": false,                    // AVX-512 embedded rounding {er}, implies {sae}.
+  "tupleType": "",                 // AVX-512 tuple-type.
   "elementSize": -1,               // Instruction element size (used by broadcast).
   "invalid": 0,                    // Number of problems detected by X86DataBase.
 
