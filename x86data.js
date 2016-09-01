@@ -525,10 +525,11 @@ $export[$as] = {
     ["mov"              , "W:r32, r32/m32"                           , "RM"      , "8B /r"                            , "ANY"],
     ["mov"              , "W:r64, r64/m64"                           , "RM"      , "REX.W 8B /r"                      , "X64"],
 
-    // TODO: Missing some forms, mov eax, fs is possible, other forms require 66H prefix.
     ["mov"              , "W:r16/m16, sreg"                          , "MR"      , "8C /r"                            , "ANY"],
+    ["mov"              , "W:r32, sreg"                              , "MR"      , "8C /r"                            , "ANY"],
     ["mov"              , "W:r64/m64, sreg"                          , "MR"      , "REX.W 8C /r"                      , "X64"],
     ["mov"              , "W:sreg, r16/m16"                          , "RM"      , "8E /r"                            , "ANY"],
+    ["mov"              , "W:sreg, r32"                              , "RM"      , "8E /r"                            , "ANY"],
     ["mov"              , "W:sreg, r64/m64"                          , "RM"      , "REX.W 8E /r"                      , "X64"],
 
     ["mov"              , "W:al, moff8"                              , "NONE"    , "A0"                               , "ANY"],
@@ -1938,9 +1939,8 @@ $export[$as] = {
     ["vmovntps"         , "W:m128, xmm"                              , "MR"      , "VEX.128.0F.WIG 2B /r"             , "ANY AVX"],
     ["vmovntps"         , "W:m256, ymm"                              , "MR"      , "VEX.256.0F.WIG 2B /r"             , "ANY AVX"],
     ["vmovq"            , "W:r64/m64, xmm"                           , "MR"      , "VEX.128.66.0F.W1 7E /r"           , "X64 AVX"],
-    ["vmovq"            , "W:xmm, m64"                               , "RM"      , "VEX.128.F3.0F.WIG 7E /r"          , "ANY AVX"],
+    ["vmovq"            , "W:xmm, xmm/m64"                           , "RM"      , "VEX.128.F3.0F.WIG 7E /r"          , "ANY AVX"],
     ["vmovq"            , "W:xmm, r64/m64"                           , "RM"      , "VEX.128.66.0F.W1 6E /r"           , "X64 AVX"],
-    ["vmovq"            , "W:xmm, xmm"                               , "RM"      , "VEX.128.F3.0F.WIG 7E /r"          , "ANY AVX"],
     ["vmovq"            , "W:xmm/m64, xmm"                           , "MR"      , "VEX.128.66.0F.WIG D6 /r"          , "ANY AVX"],
     ["vmovsd"           , "W:m64, xmm"                               , "MR"      , "VEX.LIG.F2.0F.WIG 11 /r"          , "ANY AVX"],
     ["vmovsd"           , "W:xmm, m64"                               , "RM"      , "VEX.LIG.F2.0F.WIG 10 /r"          , "ANY AVX"],

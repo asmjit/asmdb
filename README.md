@@ -99,7 +99,7 @@ The snippet above just shown how to get instructions and list basic properties. 
 const asmdb = require("asmdb");
 const x86db = new asmdb.x86util.X86DataBase().addDefault();
 
-// Get some instruction:
+// Get some instruction (the first in the group):
 const inst = x86db.getGroup("vpunpckhbw")[0];
 console.log(JSON.stringify(inst, null, 2));
 
