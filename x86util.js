@@ -349,6 +349,8 @@ class X86Instruction {
     this.implicit = false;  // Uses implicit operands (registers / memory).
     this.lock = false;      // Can be used with LOCK prefix.
     this.rep = false;       // Can be used with REP prefix.
+    this.repz = false;      // Can be used with REPE/REPZ prefix.
+    this.repnz = false;     // Can be used with REPNE/REPNZ prefix.
     this.xcr = "";          // Reads or writes to/from XCR register.
 
     this.volatile = false;  // Volatile instruction hint for the instruction scheduler.
@@ -711,6 +713,8 @@ class X86Instruction {
     switch (name) {
       case "LOCK"     : this.lock     = true; return;
       case "REP"      : this.rep      = true; return;
+      case "REPZ"     : this.repz     = true; return;
+      case "REPNZ"    : this.repnz     = true; return;
       case "FPU"      : this.fpu      = true; return;
       case "XCR"      : this.xcr      = value; return;
 

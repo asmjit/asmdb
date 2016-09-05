@@ -136,6 +136,8 @@ The stringified instruction would print something like this (with added comments
   "implicit": false,               // Uses implicit operands (registers / memory).
   "lock": false,                   // Can be used with LOCK prefix.
   "rep": false,                    // Can be used with REP prefix.
+  "repz": false,                   // Can be used with REPE/REPZ prefix.
+  "repnz": false,                  // Can be used with REPNE/REPNZ prefix.
   "xcr": "",                       // Reads or writes to/from XCR register.
   "volatile": false,               // Volatile instruction hint for the instruction scheduler.
   "privilege": 3,                  // Privilege level required to execute the instruction.

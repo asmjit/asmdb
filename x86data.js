@@ -371,10 +371,10 @@ $export[$as] = {
     ["cmp"              , "R:r32, r32/m32"                           , "RM"      , "3B /r"                            , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
     ["cmp"              , "R:r64, r64/m64"                           , "RM"      , "REX.W 3B /r"                      , "X64 OF=W SF=W ZF=W AF=W PF=W CF=W"],
 
-    ["cmpsb"            , "X:<ds:zsi>, X:<es:zdi>"                   , "NONE"    , "A6"                               , "ANY REP OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
-    ["cmpsw"            , "X:<ds:zsi>, X:<es:zdi>"                   , "NONE"    , "66 A7"                            , "ANY REP OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
-    ["cmpsd"            , "X:<ds:zsi>, X:<es:zdi>"                   , "NONE"    , "A7"                               , "ANY REP OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
-    ["cmpsq"            , "X:<ds:zsi>, X:<es:zdi>"                   , "NONE"    , "REX.W A7"                         , "X64 REP OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
+    ["cmpsb"            , "X:<ds:zsi>, X:<es:zdi>"                   , "NONE"    , "A6"                               , "ANY REPZ REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
+    ["cmpsw"            , "X:<ds:zsi>, X:<es:zdi>"                   , "NONE"    , "66 A7"                            , "ANY REPZ REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
+    ["cmpsd"            , "X:<ds:zsi>, X:<es:zdi>"                   , "NONE"    , "A7"                               , "ANY REPZ REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
+    ["cmpsq"            , "X:<ds:zsi>, X:<es:zdi>"                   , "NONE"    , "REX.W A7"                         , "X64 REPZ REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
 
     ["cmpxchg"          , "r8/m8, r8, <al>"                          , "MR"      , "0F B0 /r"                         , "ANY I486 LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
     ["cmpxchg"          , "r16/m16, r16, <ax>"                       , "MR"      , "66 0F B1 /r"                      , "ANY I486 LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
@@ -815,10 +815,10 @@ $export[$as] = {
     ["sbb"              , "r32, r32/m32"                             , "RM"      , "1B /r"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
     ["sbb"              , "r64, r64/m64"                             , "RM"      , "REX.W 1B /r"                      , "X64 LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
 
-    ["scasb"            , "R:<al>, X:<es:zdi>"                       , "NONE"    , "AE"                               , "ANY REP OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
-    ["scasw"            , "R:<ax>, X:<es:zdi>"                       , "NONE"    , "66 AF"                            , "ANY REP OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
-    ["scasd"            , "R:<eax>, X:<es:zdi>"                      , "NONE"    , "AF"                               , "ANY REP OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
-    ["scasq"            , "R:<rax>, X:<es:zdi>"                      , "NONE"    , "REX.W AF"                         , "X64 REP OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
+    ["scasb"            , "R:<al>, X:<es:zdi>"                       , "NONE"    , "AE"                               , "ANY REPZ REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
+    ["scasw"            , "R:<ax>, X:<es:zdi>"                       , "NONE"    , "66 AF"                            , "ANY REPZ REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
+    ["scasd"            , "R:<eax>, X:<es:zdi>"                      , "NONE"    , "AF"                               , "ANY REPZ REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
+    ["scasq"            , "R:<rax>, X:<es:zdi>"                      , "NONE"    , "REX.W AF"                         , "X64 REPZ REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
 
     ["seto"             , "W:r8/m8"                                  , "M"       , "0F 90 /r"                         , "ANY OF=R"],
     ["setno"            , "W:r8/m8"                                  , "M"       , "0F 91 /r"                         , "ANY OF=R"],
