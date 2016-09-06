@@ -649,8 +649,11 @@ $export[$as] = {
     ["pop"              , "W:fs"                                     , "NONE"    , "0F A1"                            , "ANY VOLATILE"],
     ["pop"              , "W:gs"                                     , "NONE"    , "0F A9"                            , "ANY VOLATILE"],
 
-    ["popa"             , ""                                         , "NONE"    , "61"                               , "X86 VOLATILE"],
-    ["popf"             , ""                                         , "NONE"    , "9D"                               , "ANY VOLATILE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["popa"             , ""                                         , "NONE"    , "66 61"                            , "X86 VOLATILE"],
+    ["popad"            , ""                                         , "NONE"    , "61"                               , "X86 VOLATILE"],
+    ["popf"             , ""                                         , "NONE"    , "66 9D"                            , "ANY VOLATILE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["popfd"            , ""                                         , "NONE"    , "9D"                               , "X86 VOLATILE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["popfq"            , ""                                         , "NONE"    , "9D"                               , "X64 VOLATILE OF=W SF=W ZF=W AF=W PF=W CF=W"],
 
     ["push"             , "R:r16/m16"                                , "M"       , "66 FF /6"                         , "ANY VOLATILE"],
     ["push"             , "R:r32/m32"                                , "M"       , "FF /6"                            , "X86 VOLATILE"],
@@ -671,8 +674,11 @@ $export[$as] = {
     ["push"             , "R:fs"                                     , "NONE"    , "0F A0"                            , "ANY VOLATILE"],
     ["push"             , "R:gs"                                     , "NONE"    , "0F A8"                            , "ANY VOLATILE"],
 
-    ["pusha"            , ""                                         , "NONE"    , "60"                               , "X86 VOLATILE"],
-    ["pushf"            , ""                                         , "NONE"    , "9C"                               , "ANY VOLATILE"],
+    ["pusha"            , ""                                         , "NONE"    , "66 60"                            , "X86 VOLATILE"],
+    ["pushad"           , ""                                         , "NONE"    , "60"                               , "X86 VOLATILE"],
+    ["pushf"            , ""                                         , "NONE"    , "66 9C"                            , "ANY VOLATILE"],
+    ["pushfd"           , ""                                         , "NONE"    , "9C"                               , "X86 VOLATILE"],
+    ["pushfq"           , ""                                         , "NONE"    , "9C"                               , "X64 VOLATILE"],
 
     ["rcl"              , "r8/m8, 1"                                 , "M"       , "D0 /2"                            , "ANY CF=W OF=W"],
     ["rcl"              , "r8/m8, cl"                                , "M"       , "D2 /2"                            , "ANY CF=W OF=W"],
@@ -885,6 +891,13 @@ $export[$as] = {
     ["sub"              , "r32, r32/m32"                             , "RM"      , "2B /r"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
     ["sub"              , "r64, r64/m64"                             , "RM"      , "REX.W 2B /r"                      , "X64 LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
 
+    ["syscall"          , ""                                         , "NONE"    , "0F 05"                            , "X64 VOLATILE"],
+    ["sysenter"         , ""                                         , "NONE"    , "0F 34"                            , "ANY VOLATILE"],
+    ["sysexit"          , ""                                         , "NONE"    , "0F 35"                            , "ANY VOLATILE"],
+    ["sysexit64"        , ""                                         , "NONE"    , "REX.W 0F 35"                      , "ANY VOLATILE"],
+    ["sysret"           , ""                                         , "NONE"    , "0F 07"                            , "X64 VOLATILE"],
+    ["sysret64"         , ""                                         , "NONE"    , "REX.W 0F 07"                      , "X64 VOLATILE"],
+
     ["swapgs"           , ""                                         , "NONE"    , "0F 01 F8"                         , "X64 VOLATILE"],
 
     ["test"             , "R:al, ib"                                 , "I"       , "A8 ib"                            , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
@@ -956,8 +969,8 @@ $export[$as] = {
     ["arpl"             , "X:r16/m16, R:r16"                         , "MR"      , "63 /r"                            , "X86 VOLATILE ZF=W"],
     ["bound"            , "R:r16, R:m32"                             , "RM"      , "66 62 /r"                         , "X86 VOLATILE"],
     ["bound"            , "R:r32, R:m64"                             , "RM"      , "62 /r"                            , "X86 VOLATILE"],
-    ["cli"              , ""                                         , "NP"      , "FA"                               , "ANY VOLATILE IF=W"],
-    ["clts"             , ""                                         , "NP"      , "0F 06"                            , "ANY VOLATILE PRIVILEGE=L0"],
+    ["cli"              , ""                                         , "NONE"    , "FA"                               , "ANY VOLATILE IF=W"],
+    ["clts"             , ""                                         , "NONE"    , "0F 06"                            , "ANY VOLATILE PRIVILEGE=L0"],
     ["hlt"              , ""                                         , "NONE"    , "F4"                               , "ANY VOLATILE PRIVILEGE=L0"],
     ["invd"             , ""                                         , "NONE"    , "0F 08"                            , "ANY VOLATILE PRIVILEGE=L0 I486"],
     ["invlpg"           , "R:mem"                                    , "M"       , "0F 01 /7"                         , "ANY VOLATILE PRIVILEGE=L0 I486"],
@@ -979,12 +992,6 @@ $export[$as] = {
     ["smsw"             , "W:r16/m16"                                , "M"       , "66 0F 01 /4"                      , "ANY VOLATILE"],
     ["smsw"             , "W:r32/m16"                                , "M"       , "0F 01 /4"                         , "ANY VOLATILE"],
     ["smsw"             , "W:r64/m16"                                , "M"       , "REX.W 0F 01 /4"                   , "X64 VOLATILE"],
-    ["syscall"          , ""                                         , "NONE"    , "0F 05"                            , "X64 VOLATILE"],
-    ["sysenter"         , ""                                         , "NONE"    , "0F 34"                            , "ANY VOLATILE"],
-    ["sysexit"          , ""                                         , "NONE"    , "0F 35"                            , "ANY VOLATILE"],
-    ["sysexit64"        , ""                                         , "NONE"    , "REX.W 0F 35"                      , "ANY VOLATILE"],
-    ["sysret"           , ""                                         , "NONE"    , "0F 07"                            , "X64 VOLATILE"],
-    ["sysret64"         , ""                                         , "NONE"    , "REX.W 0F 07"                      , "X64 VOLATILE"],
     ["rdmsr"            , "W:<edx>,W:<eax>,R:<ecx>"                  , "NONE"    , "0F 32"                            , "ANY VOLATILE PRIVILEGE=L0"],
     ["rdpmc"            , "W:<edx>,W:<eax>,R:<ecx>"                  , "NONE"    , "0F 33"                            , "ANY VOLATILE PRIVILEGE=L0"],
     ["str"              , "W:rxx/m16"                                , "M"       , "0F 00 /1"                         , "ANY VOLATILE"],
@@ -1242,7 +1249,7 @@ $export[$as] = {
 
     // CLZERO.
 
-    ["clzero"           , "R:<zax>"                                  , "NONE"    , "0F 01 FC"                         , "ANY CLZERO"],
+    ["clzero"           , "R:<ds:zax>"                               , "NONE"    , "0F 01 FC"                         , "ANY CLZERO"],
 
     // RDTSC/RDTSCP.
     ["rdtsc"            , "W:<edx>, W:<eax>"                         , "NONE"    , "0F 31"                            , "ANY VOLATILE RDTSC"],

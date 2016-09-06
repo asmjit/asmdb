@@ -40,12 +40,12 @@ AsmDB provides the following information about each X86/X64 instruction:
     * Privilege level:
       * PRIVILEGE=L[0-3] - The instruction's privilege level
 
-The `x86util.js` is designed to index everything that the database provides and present it in a much more structured form, it's a recommended tool for a post-processing.
+The `x86util.js` is designed to index everything that the database provides and to present it in a much more structured form. It's a recommended tool for a post-processing.
 
 Usage Guide
 -----------
 
-The following snippet shows the basic usage of a `x86util.X86DataBase()`:
+The following snippet shows a basic usage of a `x86util.X86DataBase()`:
 
 ```js
 // This creates an `X86DataBase` instance populated with the data provided by `x86data.js`.
