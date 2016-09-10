@@ -10,57 +10,46 @@ const hasOwn = Object.prototype.hasOwnProperty;
 // Creates an Object without a prototype (used as a map).
 function dict() { return Object.create(null); }
 
-// ============================================================================
-// [Utils]
-// ============================================================================
+function mapFromArray(arr) {
+  const map = dict();
+  for (var i = 0; i < arr.length; i++)
+    map[arr[i]] = true;
+  return map;
+}
 
-class Utils {
-  // String comparison, returns 0, -1, or 1.
-  static strcmp(a, b) { return (a < b) ? -1 : a === b ? 0 : 1; }
-  // Trim left side of a string `s` and return a new string.
-  static trimLeft(s) { return s ? s.replace(/^\s+/, "") : ""; }
-  // Uppercase the first character of a string `s` and return a new string.
-  static upFirst(s) { return s ? s.charAt(0).toUpperCase() + s.substr(1) : ""; }
+// Build an object containing CPU registers as keys mapping them to type, kind, and index.
+function buildCpuRegs(defs) {
+  const map = dict();
 
-  // Pad `s` left with spaces so the resulting string has `n` characters total.
-  static padLeft(s, n) { return " ".repeat(Math.max(n - s.length, 0)) + s; }
-  // Pad `s` right with spaces so the resulting string has `n` characters total.
-  static padRight(s, n) { return s + " ".repeat(Math.max(n - s.length, 0)); }
+  for (var type in defs) {
+    const def = defs[type];
+    const kind = def.kind;
+    const names = def.names;
 
-  static mapFromArray(arr) {
-    const map = dict();
-    for (var i = 0; i < arr.length; i++)
-      map[arr[i]] = true;
-    return map;
-  }
+    if (def.any)
+      map[def.any] = { type: type, kind: kind, index: -1 };
 
-  // Build an object containing CPU registers as keys mapping them to a registers' group.
-  static buildCpuRegs(defs) {
-    var obj = dict();
+    for (var i = 0; i < names.length; i++) {
+      var name = names[i];
+      var m = /^([\w\(\)]+)(\d+)-(\d+)([\w\(\)]*)$/.exec(name);
 
-    for (var group in defs) {
-      var regs = defs[group];
-      for (var i = 0; i < regs.length; i++) {
-        var r = regs[i];
-        var m = /^(\w+)(\d+)-(\d+)(\w*)$/.exec(r);
+      if (m) {
+        var a = parseInt(m[2], 10);
+        var b = parseInt(m[3], 10);
 
-        if (m) {
-          var a = parseInt(m[2], 10);
-          var b = parseInt(m[3], 10);
-
-          for (var n = a; n <= b; n++)
-            obj[m[1] + n + m[4]] = group;
-        }
-        else {
-          obj[r] = group;
+        for (var n = a; n <= b; n++) {
+          const index = m[1] + n + m[4];
+          map[index] = { type: type, kind: kind, index: index };
         }
       }
+      else {
+        map[name] = { type: type, kind: kind, index: i };
+      }
     }
-
-    return obj;
   }
+
+  return map;
 }
-exports.Utils = Utils;
 
 // ============================================================================
 // [Constants]
@@ -73,33 +62,9 @@ const kIndexEncoding   = 2;
 const kIndexOpcode     = 3;
 const kIndexFlags      = 4;
 
-const kCpuArchitecture = Utils.mapFromArray(x86data.architectures);
-const kCpuFeatures     = Utils.mapFromArray(x86data.features);
-
-// Only registers used by instructions.
-const kCpuRegs = Utils.buildCpuRegs({
-  "reg": [
-    "r8", "r16", "r32", "r64", "reg", "rxx",
-    "al", "ah" , "ax" , "eax", "rax", "zax",
-    "bl", "bh" , "bx" , "ebx", "rbx", "zbx",
-    "cl", "ch" , "cx" , "ecx", "rcx", "zcx",
-    "dl", "dh" , "dx" , "edx", "rdx", "zdx",
-    "di", "edi", "rdi", "zdi",
-    "si", "esi", "rsi", "zsi",
-    "bp", "ebp", "rbp", "zbp",
-    "sp", "esp", "rsp", "zsp"
-  ],
-  "sreg": ["sreg" , "cs", "ds", "es", "fs", "gs", "ss"],
-  "creg": ["creg" , "cr0-8"  ],
-  "dreg": ["dreg" , "dr0-7"  ],
-  "bnd" : ["bnd"  , "bnd0-3" ],
-  "st"  : ["st(0)", "st(i)"  ],
-  "mm"  : ["mm"   , "mm0-7"  ],
-  "k"   : ["k"    , "k0-7"   ],
-  "xmm" : ["xmm"  , "xmm0-31"],
-  "ymm" : ["ymm"  , "ymm0-31"],
-  "zmm" : ["zmm"  , "zmm0-31"]
-});
+const kCpuArchitecture = mapFromArray(x86data.architectures);
+const kCpuFeatures     = mapFromArray(x86data.features);
+const kCpuRegisters    = buildCpuRegs(x86data.registers);
 
 const kCpuFlags = {
   "OF": true, // Overflow flag.
@@ -118,21 +83,27 @@ const kCpuFlags = {
 };
 
 // ============================================================================
-// [X86Util]
+// [misc]
 // ============================================================================
 
-// X86/X64 utilities.
-class X86Util {
+// Miscellaneous functions.
+class misc {
   // Get whether the string `s` describes a register operand.
-  static isRegOp(s) { return s && hasOwn.call(kCpuRegs, s); }
+  static isRegOp(s) { return s && hasOwn.call(kCpuRegisters, s); }
   // Get whether the string `s` describes a memory operand.
   static isMemOp(s) { return s && /^(?:mem|mib|(?:m(?:off)?\d+(?:dec|bcd|fp|int)?)|(?:vm\d+(?:x|y|z)))$/.test(s); }
   // Get whether the string `s` describes an immediate operand.
   static isImmOp(s) { return s && /^(?:1|i4|ib|iw|id|iq)$/.test(s); }
   // Get whether the string `s` describes a relative displacement (label).
   static isRelOp(s) { return s && /^rel\d+$/.test(s); }
-  // Get a register class based on string `s`, or `null` if `s` is not a register.
-  static regClass(s) { return kCpuRegs[s] || null; }
+
+  // Get a register type of a `s`, returns `null` if the register is unknown.
+  static regTypeOf(s) { return hasOwn.call(kCpuRegisters, s) ? kCpuRegisters[s].type : null; }
+  // Get a register kind of a `s`, returns `null` if the register is unknown.
+  static regKindOf(s) { return hasOwn.call(kCpuRegisters, s) ? kCpuRegisters[s].kind : null; }
+  // Get a register type of a `s`, returns `null` if the register is unknown and `-1`
+  // if the given string does only represent a register type, but not a specific reg.
+  static regIndexOf(s) { return hasOwn.call(kCpuRegisters, s) ? kCpuRegisters[s].index : null; }
 
   // Get size in bytes of an immediate `s`.
   //
@@ -158,7 +129,7 @@ class X86Util {
     return -1;
   }
 }
-exports.X86Util = X86Util;
+exports.misc = misc;
 
 // ============================================================================
 // [X86Operand]
@@ -170,7 +141,7 @@ class X86Operand {
     this.data = data;       // The operand's data (processed).
 
     this.reg = "";          // Register operand's definition.
-    this.regClass = "";     // Register operand's class.
+    this.regType = "";      // Register operand's type.
 
     this.mem = "";          // Memory operand's definition.
     this.memSize = -1;      // Memory operand's size.
@@ -245,14 +216,14 @@ class X86Operand {
         op = op.substr(3);
       }
 
-      if (X86Util.isRegOp(op)) {
+      if (misc.isRegOp(op)) {
         this.reg = op;
-        this.regClass = X86Util.regClass(op);
+        this.regType = misc.regTypeOf(op);
 
         continue;
       }
 
-      if (X86Util.isMemOp(op)) {
+      if (misc.isMemOp(op)) {
         this.mem = op;
 
         // Handle memory size.
@@ -270,8 +241,8 @@ class X86Operand {
         continue;
       }
 
-      if (X86Util.isImmOp(op)) {
-        this.imm = X86Util.immSize(op);
+      if (misc.isImmOp(op)) {
+        this.imm = misc.immSize(op);
         if (op === "1") {
           this.implicit = true;
           this.immValue = 1;
@@ -279,8 +250,8 @@ class X86Operand {
         continue;
       }
 
-      if (X86Util.isRelOp(op)) {
-        this.rel = X86Util.relSize(op);
+      if (misc.isRelOp(op)) {
+        this.rel = misc.relSize(op);
         continue;
       }
 
@@ -560,7 +531,7 @@ class X86Instruction {
 
         // Parse immediate byte, word, dword, or qword.
         if (/^(?:ib|iw|id|iq|\/is4)$/.test(comp)) {
-          this.imm += X86Util.immSize(comp);
+          this.imm += misc.immSize(comp);
           continue;
         }
 
@@ -649,7 +620,7 @@ class X86Instruction {
 
         // Parse immediate byte, word, dword, or qword.
         if (/^(?:ib|iw|id|iq)$/.test(comp)) {
-          this.imm += X86Util.immSize(comp);
+          this.imm += misc.immSize(comp);
           continue;
         }
 

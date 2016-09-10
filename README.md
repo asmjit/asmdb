@@ -169,7 +169,7 @@ The stringified instruction would print something like this (with added comments
   "operands": [{
     "data": "xmm",                 // The operand's data (processed).
     "reg": "xmm",                  // Register operand's definition.
-    "regClass": "xmm",             // Register operand's class.
+    "regType": "xmm",              // Register operand's type (would differ if reg is "eax" for example).
     "mem": "",                     // Memory operand's definition.
     "memSize": -1,                 // Memory operand's size.
     "memOff": false,               // Memory operand is an absolute offset (only a specific version of MOV).
@@ -188,7 +188,7 @@ The stringified instruction would print something like this (with added comments
   }, {
     "data": "xmm",                 // ...
     "reg": "xmm",
-    "regClass": "xmm",
+    "regType": "xmm",
     "mem": "",
     "memSize": -1,
     "memOff": false,
@@ -207,7 +207,7 @@ The stringified instruction would print something like this (with added comments
   }, {
     "data": "xmm/m128",
     "reg": "xmm",
-    "regClass": "xmm",
+    "regType": "xmm",
     "mem": "m128",
     "memSize": 128,
     "memOff": false,

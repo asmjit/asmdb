@@ -153,6 +153,25 @@ $export[$as] = {
     "XSAVE_OPT"
   ],
 
+  registers: {
+    "r8"  : { kind: "gp"  , any: "r8"   , names: ["al", "cl", "dl", "bl", "spl", "bpl", "sil", "dil", "r8-15b"] },
+    "r8hi": { kind: "gp"                , names: ["ah", "ch", "dh", "bh"] },
+    "r16" : { kind: "gp"  , any: "r16"  , names: ["ax", "cx", "dx", "bx", "sp", "bp", "si", "di", "r8-15w"] },
+    "r32" : { kind: "gp"  , any: "r32"  , names: ["eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi", "r8-15d"] },
+    "r64" : { kind: "gp"  , any: "r64"  , names: ["rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8-15"] },
+    "rxx" : { kind: "gp"                , names: ["zax", "zcx", "zdx", "zbx", "zsp", "zbp", "zsi", "zdi"] },
+    "sreg": { kind: "sreg", any: "sreg" , names: ["es", "cs", "ss", "ds", "fs", "gs" ] },
+    "creg": { kind: "creg", any: "creg" , names: ["cr0-15"]  },
+    "dreg": { kind: "dreg", any: "dreg" , names: ["dr0-15"]  },
+    "bnd" : { kind: "bnd" , any: "bnd"  , names: ["bnd0-3"]  },
+    "st"  : { kind: "st"  , any: "st(i)", names: ["st(0-7)"] },
+    "mm"  : { kind: "mm"  , any: "mm"   , names: ["mm0-7"]   },
+    "k"   : { kind: "k"   , any: "k"    , names: ["k0-7"]    },
+    "xmm" : { kind: "vec" , any: "xmm"  , names: ["xmm0-31"] },
+    "ymm" : { kind: "vec" , any: "ymm"  , names: ["ymm0-31"] },
+    "zmm" : { kind: "vec" , any: "zmm"  , names: ["zmm0-31"] }
+  },
+
   instructions: [
     // X86/X64.
     ["aaa"              , "<ax>"                                     , "NONE"    , "37"                               , "X86 OF=U SF=U ZF=U AF=W PF=U CF=W"],
@@ -1741,7 +1760,7 @@ $export[$as] = {
     ["pi2fd"            , "W:mm, mm/m64"                             , "RM"      , "0F 0F /r 0D"                      , "ANY 3DNOW"],
     ["pi2fw"            , "W:mm, mm/m64"                             , "RM"      , "0F 0F /r 0C"                      , "ANY 3DNOW2"],
     ["pmulhrw"          , "X:mm, mm/m64"                             , "RM"      , "0F 0F /r B7"                      , "ANY 3DNOW"],
-    ["prefetch3dnow"    , "R:mem"                                    , "M"       , "0F 0D /0"                         , "ANY 3DNOW"],
+    ["prefetch"         , "R:mem"                                    , "M"       , "0F 0D /0"                         , "ANY 3DNOW"],
     ["pswapd"           , "W:mm, mm/m64"                             , "RM"      , "0F 0F /r BB"                      , "ANY 3DNOW2"],
 
     // AES.
