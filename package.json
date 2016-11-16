@@ -1,15 +1,14 @@
 {
   "name": "asmdb",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "license": "Unlicense",
   "engines": { "node": ">=4" },
 
   "description": "X86/X64 instruction database and utilities.",
   "keywords": [
-    "asm",
-    "assembler",
-    "x86",
-    "x64"
+    "asm", "assembler",
+    "arm", "thumb", "aarch32", "aarch64",
+    "x86", "x86_64", "x64"
   ],
 
   "homepage": "https://github.com/asmjit/asmdb",
