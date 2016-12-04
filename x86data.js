@@ -12,6 +12,7 @@
 // engines, and also to have data that can be used to generate instruction tables
 // for developers.
 
+
 // INSTRUCTIONS
 // ------------
 //
@@ -21,10 +22,11 @@
 //   [1] - Instruction operands.
 //   [2] - Instruction encoding.
 //   [3] - Instruction opcodes.
-//   [4] - Instruction tags - EFLAGs, CPU requirements, and some other metadata.
+//   [4] - Instruction tags - CPU requirements, EFLAGS (read/write), and other metadata.
 //
 // The definition tries to match Intel and AMD instruction set manuals, but there
 // are small differences to make the definition more informative and compact.
+
 
 // REGISTERS
 // ---------
@@ -34,10 +36,10 @@
 //             used to encode the instruction. Assemblers and disassemblers
 //             may decide how to show this operand.
 //
-//   "<reg>" - Designed for AsmJit, implicit register that is omitted in
-//             X86Assembler, but has to be specified in X86Compiler (there
-//             is no other way, when using X86Compiler all registers, implicit
-//             or explicit, has to be passed.
+//   "<reg>" - Specifies an implicit register used by the instruction. This
+//             data is used mostly by AsmJit's explicit syntax that is used
+//             by X86Compiler and also recognized by X86Assembler.
+
 
 // READ/WRITE INFORMATION
 // ----------------------
@@ -57,6 +59,7 @@
 // or read and written. This is important in case that you want to generate tables
 // that will be used to schedule/reorder the instruction stream. Also note that this
 // DB always uses BYTE indexes, not BITS, as used in Intel instruction set manuals.
+
 
 // WHAT IS MISSING
 // ---------------
@@ -125,6 +128,7 @@ $export[$as] = {
     "LZCNT",
     "MPX",
     "MMX",
+    "MMX2",
     "MONITOR",
     "MOVBE",
     "MSR",
@@ -1393,7 +1397,7 @@ $export[$as] = {
     ["ldmxcsr"          , "R:m32"                                    , "M"       , "0F AE /2"                         , "ANY SSE"],
     ["lfence"           , ""                                         , "NONE"    , "0F AE /5"                         , "ANY VOLATILE SSE2"],
     ["maskmovdqu"       , "X:xmm, xmm, <ds:zdi>"                     , "RM"      , "66 0F F7 /r"                      , "ANY SSE2"],
-    ["maskmovq"         , "X:mm, mm, <ds:zdi>"                       , "RM"      , "0F F7 /r"                         , "ANY SSE"],
+    ["maskmovq"         , "X:mm, mm, <ds:zdi>"                       , "RM"      , "0F F7 /r"                         , "ANY MMX2"],
     ["maxpd"            , "X:xmm, xmm/m128"                          , "RM"      , "66 0F 5F /r"                      , "ANY SSE2"],
     ["maxps"            , "X:xmm, xmm/m128"                          , "RM"      , "0F 5F /r"                         , "ANY SSE"],
     ["maxsd"            , "X:xmm, xmm/m64"                           , "RM"      , "F2 0F 5F /r"                      , "ANY SSE2"],
@@ -1441,7 +1445,7 @@ $export[$as] = {
     ["movnti"           , "W:m64, r64"                               , "MR"      , "REX.W 0F C3 /r"                   , "X64 SSE2"],
     ["movntpd"          , "W:m128, xmm"                              , "MR"      , "66 0F 2B /r"                      , "ANY SSE2"],
     ["movntps"          , "W:m128, xmm"                              , "MR"      , "0F 2B /r"                         , "ANY SSE"],
-    ["movntq"           , "W:m64, mm"                                , "MR"      , "0F E7 /r"                         , "ANY MMX"],
+    ["movntq"           , "W:m64, mm"                                , "MR"      , "0F E7 /r"                         , "ANY MMX2"],
     ["movntsd"          , "W:m64, xmm"                               , "RM"      , "F2 0F 2B /r"                      , "ANY SSE4A"],
     ["movntss"          , "W:m32, xmm"                               , "RM"      , "F3 0F 2B /r"                      , "ANY SSE4A"],
     ["movq"             , "W:mm, mm/m64"                             , "RM"      , "0F 6F /r"                         , "ANY MMX"],
@@ -1507,9 +1511,9 @@ $export[$as] = {
     ["pand"             , "X:xmm, xmm/m128"                          , "RM"      , "66 0F DB /r"                      , "ANY SSE2"],
     ["pandn"            , "X:mm, mm/m64"                             , "RM"      , "0F DF /r"                         , "ANY MMX"],
     ["pandn"            , "X:xmm, xmm/m128"                          , "RM"      , "66 0F DF /r"                      , "ANY SSE2"],
-    ["pavgb"            , "X:mm, mm/m64"                             , "RM"      , "0F E0 /r"                         , "ANY SSE"],
+    ["pavgb"            , "X:mm, mm/m64"                             , "RM"      , "0F E0 /r"                         , "ANY MMX2"],
     ["pavgb"            , "X:xmm, xmm/m128"                          , "RM"      , "66 0F E0 /r"                      , "ANY SSE2"],
-    ["pavgw"            , "X:mm, mm/m64"                             , "RM"      , "0F E3 /r"                         , "ANY SSE"],
+    ["pavgw"            , "X:mm, mm/m64"                             , "RM"      , "0F E3 /r"                         , "ANY MMX2"],
     ["pavgw"            , "X:xmm, xmm/m128"                          , "RM"      , "66 0F E3 /r"                      , "ANY SSE2"],
     ["pblendvb"         , "X:xmm, xmm/m128, <xmm0>"                  , "RM"      , "66 0F E0 /r"                      , "ANY SSE4_1"],
     ["pblendw"          , "X:xmm, xmm/m128, ib"                      , "RMI"     , "66 0F 3A 0E /r ib"                , "ANY SSE4_1"],
@@ -1537,8 +1541,8 @@ $export[$as] = {
     ["pextrd"           , "W:r32/m32, xmm, ib"                       , "MRI"     , "66 0F 3A 16 /r"                   , "ANY SSE4_1"],
     ["pextrd"           , "W:r64, xmm, ib"                           , "MRI"     , "66 0F 3A 16 /r"                   , "X64 SSE4_1"],
     ["pextrq"           , "W:r64/m64, xmm, ib"                       , "MRI"     , "REX.W 66 0F 3A 16 /r ib"          , "X64 SSE4_1"],
-    ["pextrw"           , "W:r32, mm, ib"                            , "RMI"     , "0F C5 /r ib"                      , "ANY SSE"],
-    ["pextrw"           , "W:r64, mm, ib"                            , "RMI"     , "0F C5 /r ib"                      , "X64 SSE"],
+    ["pextrw"           , "W:r32, mm, ib"                            , "RMI"     , "0F C5 /r ib"                      , "ANY MMX2"],
+    ["pextrw"           , "W:r64, mm, ib"                            , "RMI"     , "0F C5 /r ib"                      , "X64 MMX2"],
     ["pextrw"           , "W:r32, xmm, ib"                           , "RMI"     , "66 0F C5 /r ib"                   , "ANY SSE2"],
     ["pextrw"           , "W:r64, xmm, ib"                           , "RMI"     , "66 0F C5 /r ib"                   , "X64 SSE2"],
     ["pextrw"           , "W:r32/m16, xmm, ib"                       , "MRI"     , "66 0F 3A 15 /r ib"                , "ANY SSE4_1"],
@@ -1561,8 +1565,8 @@ $export[$as] = {
     ["pinsrd"           , "X:xmm, r32/m32, ib"                       , "RMI"     , "66 0F 3A 22 /r ib"                , "ANY SSE4_1"],
     ["pinsrd"           , "X:xmm, r64, ib"                           , "RMI"     , "66 0F 3A 22 /r ib"                , "X64 SSE4_1"],
     ["pinsrq"           , "X:xmm, r64/m64, ib"                       , "RMI"     , "REX.W 66 0F 3A 22 /r ib"          , "X64 SSE4_1"],
-    ["pinsrw"           , "X:mm, r32/m16, ib"                        , "RMI"     , "0F C4 /r ib"                      , "ANY SSE"],
-    ["pinsrw"           , "X:mm, r64, ib"                            , "RMI"     , "0F C4 /r ib"                      , "X64 SSE"],
+    ["pinsrw"           , "X:mm, r32/m16, ib"                        , "RMI"     , "0F C4 /r ib"                      , "ANY MMX2"],
+    ["pinsrw"           , "X:mm, r64, ib"                            , "RMI"     , "0F C4 /r ib"                      , "X64 MMX2"],
     ["pinsrw"           , "X:xmm, r32/m16, ib"                       , "RMI"     , "66 0F C4 /r ib"                   , "ANY SSE2"],
     ["pinsrw"           , "X:xmm, r64, ib"                           , "RMI"     , "66 0F C4 /r ib"                   , "X64 SSE2"],
     ["pmaddubsw"        , "X:mm, mm/m64"                             , "RM"      , "0F 38 04 /r"                      , "ANY SSSE3"],
@@ -1571,22 +1575,22 @@ $export[$as] = {
     ["pmaddwd"          , "X:xmm, xmm/m128"                          , "RM"      , "66 0F F5 /r"                      , "ANY SSE2"],
     ["pmaxsb"           , "X:xmm, xmm/m128"                          , "RM"      , "66 0F 38 3C /r"                   , "ANY SSE4_1"],
     ["pmaxsd"           , "X:xmm, xmm/m128"                          , "RM"      , "66 0F 38 3D /r"                   , "ANY SSE4_1"],
-    ["pmaxsw"           , "X:mm, mm/m64"                             , "RM"      , "0F EE /r"                         , "ANY SSE"],
+    ["pmaxsw"           , "X:mm, mm/m64"                             , "RM"      , "0F EE /r"                         , "ANY MMX2"],
     ["pmaxsw"           , "X:xmm, xmm/m128"                          , "RM"      , "66 0F EE /r"                      , "ANY SSE2"],
-    ["pmaxub"           , "X:mm, mm/m64"                             , "RM"      , "0F DE /r"                         , "ANY SSE"],
+    ["pmaxub"           , "X:mm, mm/m64"                             , "RM"      , "0F DE /r"                         , "ANY MMX2"],
     ["pmaxub"           , "X:xmm, xmm/m128"                          , "RM"      , "66 0F DE /r"                      , "ANY SSE2"],
     ["pmaxud"           , "X:xmm, xmm/m128"                          , "RM"      , "66 0F 38 3F /r"                   , "ANY SSE4_1"],
     ["pmaxuw"           , "X:xmm, xmm/m128"                          , "RM"      , "66 0F 38 3E /r"                   , "ANY SSE4_1"],
     ["pminsb"           , "X:xmm, xmm/m128"                          , "RM"      , "66 0F 38 38 /r"                   , "ANY SSE4_1"],
     ["pminsd"           , "X:xmm, xmm/m128"                          , "RM"      , "66 0F 38 39 /r"                   , "ANY SSE4_1"],
-    ["pminsw"           , "X:mm, mm/m64"                             , "RM"      , "0F EA /r"                         , "ANY SSE"],
+    ["pminsw"           , "X:mm, mm/m64"                             , "RM"      , "0F EA /r"                         , "ANY MMX2"],
     ["pminsw"           , "X:xmm, xmm/m128"                          , "RM"      , "66 0F EA /r"                      , "ANY SSE2"],
-    ["pminub"           , "X:mm, mm/m64"                             , "RM"      , "0F DA /r"                         , "ANY SSE"],
+    ["pminub"           , "X:mm, mm/m64"                             , "RM"      , "0F DA /r"                         , "ANY MMX2"],
     ["pminub"           , "X:xmm, xmm/m128"                          , "RM"      , "66 0F DA /r"                      , "ANY SSE2"],
     ["pminud"           , "X:xmm, xmm/m128"                          , "RM"      , "66 0F 38 3B /r"                   , "ANY SSE4_1"],
     ["pminuw"           , "X:xmm, xmm/m128"                          , "RM"      , "66 0F 38 3A /r"                   , "ANY SSE4_1"],
-    ["pmovmskb"         , "W:r32, mm"                                , "RM"      , "0F D7 /r"                         , "ANY SSE"],
-    ["pmovmskb"         , "W:r64, mm"                                , "RM"      , "0F D7 /r"                         , "X64 SSE"],
+    ["pmovmskb"         , "W:r32, mm"                                , "RM"      , "0F D7 /r"                         , "ANY MMX2"],
+    ["pmovmskb"         , "W:r64, mm"                                , "RM"      , "0F D7 /r"                         , "X64 MMX2"],
     ["pmovmskb"         , "W:r32, xmm"                               , "RM"      , "66 0F D7 /r"                      , "ANY SSE2"],
     ["pmovmskb"         , "W:r64, xmm"                               , "RM"      , "66 0F D7 /r"                      , "X64 SSE2"],
     ["pmovsxbd"         , "W:xmm, xmm/m32"                           , "RM"      , "66 0F 38 21 /r"                   , "ANY SSE4_1"],
@@ -1604,7 +1608,7 @@ $export[$as] = {
     ["pmuldq"           , "X:xmm, xmm/m128"                          , "RM"      , "66 0F 38 28 /r"                   , "ANY SSE4_1"],
     ["pmulhrsw"         , "X:mm, mm/m64"                             , "RM"      , "0F 38 0B /r"                      , "ANY SSSE3"],
     ["pmulhrsw"         , "X:xmm, xmm/m128"                          , "RM"      , "66 0F 38 0B /r"                   , "ANY SSSE3"],
-    ["pmulhuw"          , "X:mm, mm/m64"                             , "RM"      , "0F E4 /r"                         , "ANY SSE"],
+    ["pmulhuw"          , "X:mm, mm/m64"                             , "RM"      , "0F E4 /r"                         , "ANY MMX2"],
     ["pmulhuw"          , "X:xmm, xmm/m128"                          , "RM"      , "66 0F E4 /r"                      , "ANY SSE2"],
     ["pmulhw"           , "X:mm, mm/m64"                             , "RM"      , "0F E5 /r"                         , "ANY MMX"],
     ["pmulhw"           , "X:xmm, xmm/m128"                          , "RM"      , "66 0F E5 /r"                      , "ANY SSE2"],
@@ -1615,18 +1619,18 @@ $export[$as] = {
     ["pmuludq"          , "X:xmm, xmm/m128"                          , "RM"      , "66 0F F4 /r"                      , "ANY SSE2"],
     ["por"              , "X:mm, mm/m64"                             , "RM"      , "0F EB /r"                         , "ANY MMX"],
     ["por"              , "X:xmm, xmm/m128"                          , "RM"      , "66 0F EB /r"                      , "ANY SSE2"],
-    ["prefetchnta"      , "R:mem"                                    , "M"       , "0F 18 /0"                         , "ANY SSE"],
-    ["prefetcht0"       , "R:mem"                                    , "M"       , "0F 18 /1"                         , "ANY SSE"],
-    ["prefetcht1"       , "R:mem"                                    , "M"       , "0F 18 /2"                         , "ANY SSE"],
-    ["prefetcht2"       , "R:mem"                                    , "M"       , "0F 18 /3"                         , "ANY SSE"],
-    ["psadbw"           , "X:mm, mm/m64"                             , "RM"      , "0F F6 /r"                         , "ANY SSE"],
+    ["prefetchnta"      , "R:mem"                                    , "M"       , "0F 18 /0"                         , "ANY MMX2"],
+    ["prefetcht0"       , "R:mem"                                    , "M"       , "0F 18 /1"                         , "ANY MMX2"],
+    ["prefetcht1"       , "R:mem"                                    , "M"       , "0F 18 /2"                         , "ANY MMX2"],
+    ["prefetcht2"       , "R:mem"                                    , "M"       , "0F 18 /3"                         , "ANY MMX2"],
+    ["psadbw"           , "X:mm, mm/m64"                             , "RM"      , "0F F6 /r"                         , "ANY MMX2"],
     ["psadbw"           , "X:xmm, xmm/m128"                          , "RM"      , "66 0F F6 /r"                      , "ANY SSE2"],
     ["pshufb"           , "W:mm, mm/m64"                             , "RM"      , "0F 38 00 /r"                      , "ANY SSSE3"],
     ["pshufb"           , "W:xmm, xmm/m128"                          , "RM"      , "66 0F 38 00 /r"                   , "ANY SSSE3"],
     ["pshufd"           , "W:xmm, xmm/m128, ib"                      , "RMI"     , "66 0F 70 /r ib"                   , "ANY SSE2"],
     ["pshufhw"          , "W:xmm, xmm/m128, ib"                      , "RMI"     , "F3 0F 70 /r ib"                   , "ANY SSE2"],
     ["pshuflw"          , "W:xmm, xmm/m128, ib"                      , "RMI"     , "F2 0F 70 /r ib"                   , "ANY SSE2"],
-    ["pshufw"           , "W:mm, mm/m64, ib"                         , "RMI"     , "0F 70 /r ib"                      , "ANY MMX"],
+    ["pshufw"           , "W:mm, mm/m64, ib"                         , "RMI"     , "0F 70 /r ib"                      , "ANY MMX2"],
     ["psignb"           , "X:mm, mm/m64"                             , "RM"      , "0F 38 08 /r"                      , "ANY SSSE3"],
     ["psignb"           , "X:xmm, xmm/m128"                          , "RM"      , "66 0F 38 08 /r"                   , "ANY SSSE3"],
     ["psignd"           , "X:mm, mm/m64"                             , "RM"      , "0F 38 0A /r"                      , "ANY SSSE3"],
@@ -1708,7 +1712,7 @@ $export[$as] = {
     ["roundss"          , "W[3:0]:xmm, xmm/m32, ib"                  , "RMI"     , "66 0F 3A 0A /r ib"                , "ANY SSE4_1"],
     ["rsqrtps"          , "W:xmm, xmm/m128"                          , "RM"      , "0F 52 /r"                         , "ANY SSE"],
     ["rsqrtss"          , "W[3:0]:xmm, xmm/m32"                      , "RM"      , "F3 0F 52 /r"                      , "ANY SSE"],
-    ["sfence"           , ""                                         , "NONE"    , "0F AE /7"                         , "ANY VOLATILE SSE"],
+    ["sfence"           , ""                                         , "NONE"    , "0F AE /7"                         , "ANY VOLATILE MMX2"],
     ["shufpd"           , "X:xmm, xmm/m128, ib"                      , "RMI"     , "66 0F C6 /r ib"                   , "ANY SSE2"],
     ["shufps"           , "X:xmm, xmm/m128, ib"                      , "RMI"     , "0F C6 /r ib"                      , "ANY SSE"],
     ["sqrtpd"           , "W:xmm, xmm/m128"                          , "RM"      , "66 0F 51 /r"                      , "ANY SSE2"],

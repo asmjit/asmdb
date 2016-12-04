@@ -1,10 +1,16 @@
-// [x86util.js]
+// [x86.js]
 // X86/X64 instruction-set utilities that use `x86data.js`.
+//
+// [License]
+// Public Domain.
 
 (function($export, $as) {
 "use strict";
 
+const x86 = $export[$as] = {};
+const base = $export.x86data ? $export.base : require("./base.js");
 const x86data = $export.x86data ? $export.x86data : require("./x86data.js");
+
 const hasOwn = Object.prototype.hasOwnProperty;
 
 // Creates an Object without a prototype (used as a map).
@@ -55,13 +61,6 @@ function buildCpuRegs(defs) {
 // [Constants]
 // ============================================================================
 
-// Indexes used by x86-data.
-const kIndexName       = 0;
-const kIndexOperands   = 1;
-const kIndexEncoding   = 2;
-const kIndexOpcode     = 3;
-const kIndexFlags      = 4;
-
 const kCpuArchitecture = mapFromArray(x86data.architectures);
 const kCpuFeatures     = mapFromArray(x86data.features);
 const kCpuRegisters    = buildCpuRegs(x86data.registers);
@@ -83,11 +82,23 @@ const kCpuFlags = {
 };
 
 // ============================================================================
-// [misc]
+// [asmdb.x86.Utils]
 // ============================================================================
 
-// Miscellaneous functions.
-class misc {
+// X86/X64 utilities.
+class Utils {
+  // Split the operand(s) string into individual operands as defined by the
+  // instruction database.
+  //
+  // NOTE: X86/X64 doesn't require anything else than separating the commas,
+  // this function is here for compatibility with other instruction sets.
+  static splitOperands(s) {
+    const array = s.split(",");
+    for (var i = 0; i < array.length; i++)
+      array[i] = array[i].trim();
+    return array;
+  }
+
   // Get whether the string `s` describes a register operand.
   static isRegOp(s) { return s && hasOwn.call(kCpuRegisters, s); }
   // Get whether the string `s` describes a memory operand.
@@ -129,16 +140,21 @@ class misc {
     return -1;
   }
 }
-exports.misc = misc;
+x86.Utils = Utils;
 
 // ============================================================================
-// [X86Operand]
+// [asmdb.x86.Operand]
 // ============================================================================
 
-// X86/X64 operand
-class X86Operand {
+// X86/X64 operand.
+class Operand {
   constructor(data, defaultAccess) {
-    this.data = data;       // The operand's data (processed).
+    this.data = data;       // The operand's data (possibly processed).
+    this.type = "";         // Type of the operand ("reg", "mem", "reg/mem", "imm", "rel").
+
+    this.read = false;      // True if the operand is a read-op (R or X) from reg/mem.
+    this.write = false;     // True if the operand is a write-op (W or X) to reg/mem.
+    this.implicit = false;  // True if the operand is an implicit register (not encoded in binary).
 
     this.reg = "";          // Register operand's definition.
     this.regType = "";      // Register operand's type.
@@ -155,11 +171,10 @@ class X86Operand {
     this.immValue = null;   // Immediate value - `null` or `1` (only used by shift/rotate instructions).
     this.rel = 0;           // Relative displacement operand's size.
 
-    this.read = false;      // True if the operand is a read-op (R or X) from reg/mem.
-    this.write = false;     // True if the operand is a write-op (W or X) to reg/mem.
     this.rwxIndex = -1;     // Read/Write (RWX) index.
     this.rwxWidth = -1;     // Read/Write (RWX) width.
-    this.implicit = false;  // True if the operand is an implicit register (not encoded in binary).
+
+    const type = [];
 
     // Handle RWX decorators prefix in "R|W|X[A:B]:" format.
     var m = /^(R|W|X)(\[(\d+)\:(\d+)\])?\:/.exec(data);
@@ -200,10 +215,6 @@ class X86Operand {
       data = data.substring(1, data.length - 1);
     }
 
-    // In case the data has been modified it's always better to use the stripped off
-    // version as we have already processed and stored all the possible decorators.
-    this.data = data;
-
     // Support multiple operands separated by "/" (only used by r/m style definition).
     var ops = data.split("/");
     for (var i = 0; i < ops.length; i++) {
@@ -216,14 +227,15 @@ class X86Operand {
         op = op.substr(3);
       }
 
-      if (misc.isRegOp(op)) {
+      if (Utils.isRegOp(op)) {
         this.reg = op;
-        this.regType = misc.regTypeOf(op);
+        this.regType = Utils.regTypeOf(op);
 
+        type.push("reg");
         continue;
       }
 
-      if (misc.isMemOp(op)) {
+      if (Utils.isMemOp(op)) {
         this.mem = op;
 
         // Handle memory size.
@@ -238,25 +250,35 @@ class X86Operand {
           this.vsibSize = parseInt(m[1], 10);
         }
 
+        type.push("mem");
         continue;
       }
 
-      if (misc.isImmOp(op)) {
-        this.imm = misc.immSize(op);
+      if (Utils.isImmOp(op)) {
+        this.imm = Utils.immSize(op);
         if (op === "1") {
           this.implicit = true;
           this.immValue = 1;
         }
+
+        type.push("imm");
         continue;
       }
 
-      if (misc.isRelOp(op)) {
-        this.rel = misc.relSize(op);
+      if (Utils.isRelOp(op)) {
+        this.rel = Utils.relSize(op);
+
+        type.push("rel");
         continue;
       }
 
-      console.log(`Unhandled operand: '${op}'`);
+      throw Error(`asmdb.x86.Operand(): Unhandled operand '${op}'`);
     }
+
+    // In case the data has been modified it's always better to use the stripped off
+    // version as we have already processed and stored all the possible decorators.
+    this.data = data;
+    this.type = type.join("/");
   }
 
   setAccess(access) {
@@ -269,9 +291,8 @@ class X86Operand {
   isMem() { return !!this.mem; }
   isImm() { return !!this.imm; }
   isRel() { return !!this.rel; }
-
-  isRegAndMem() { return !!this.reg && !!this.mem; }
   isRegOrMem() { return !!this.reg || !!this.mem; }
+  isRegAndMem() { return !!this.reg && !!this.mem; }
 
   toRegMem() {
     if (this.reg && this.mem)
@@ -286,68 +307,68 @@ class X86Operand {
 
   toString() { return this.data; }
 }
-exports.X86Operand = X86Operand;
+x86.Operand = Operand;
 
 // ============================================================================
-// [X86Instruction]
+// [asmdb.x86.Instruction]
 // ============================================================================
 
 // X86/X64 instruction.
-class X86Instruction {
+class Instruction {
   constructor(name, operands, encoding, opcode, flags) {
-    this.name = name;       // Instruction name.
-    this.arch = "ANY";      // Architecture - ANY, X86, X64.
-    this.encoding = "";     // Instruction encoding.
+    this.name = name;         // Instruction name.
+    this.arch = "ANY";        // Architecture - ANY, X86, X64.
+    this.encoding = "";       // Instruction encoding.
 
-    this.prefix = "";       // Prefix - "", "3DNOW", "EVEX", "VEX", "XOP".
+    this.prefix = "";         // Prefix - "", "3DNOW", "EVEX", "VEX", "XOP".
 
-    this.opcode = "";       // A single opcode byte as a hex string, "00-FF".
-    this.opcodeInt = 0;     // A single opcode byte as an integer (0..255).
-    this.opcodeString = ""; // The whole opcode string, as specified in manual.
+    this.opcode = "";         // A single opcode byte as a hex string, "00-FF".
+    this.opcodeInt = 0;       // A single opcode byte as an integer (0..255).
+    this.opcodeString = "";   // The whole opcode string, as specified in manual.
 
-    this.l = "";            // Opcode L field (nothing, 128, 256, 512).
-    this.w = "";            // Opcode W field.
-    this.pp = "";           // Opcode PP part.
-    this.mm = "";           // Opcode MM[MMM] part.
-    this.vvvv = "";         // Opcode VVVV part.
-    this._67h = false;      // Instruction requires a size override prefix.
+    this.l = "";              // Opcode L field (nothing, 128, 256, 512).
+    this.w = "";              // Opcode W field.
+    this.pp = "";             // Opcode PP part.
+    this.mm = "";             // Opcode MM[MMM] part.
+    this.vvvv = "";           // Opcode VVVV part.
+    this._67h = false;        // Instruction requires a size override prefix.
 
-    this.rm = "";           // Instruction specific payload "/0..7".
-    this.rmInt = -1;        // Instruction specific payload as integer (0-7).
-    this.ri = false;        // Instruction opcode is combined with register, "XX+r" or "XX+i".
-    this.rel = 0;           // Displacement (cb cw cd parts).
+    this.rm = "";             // Instruction specific payload "/0..7".
+    this.rmInt = -1;          // Instruction specific payload as integer (0-7).
+    this.ri = false;          // Instruction opcode is combined with register, "XX+r" or "XX+i".
+    this.rel = 0;             // Displacement (cb cw cd parts).
 
-    this.implicit = false;  // Uses implicit operands (registers / memory).
-    this.lock = false;      // Can be used with LOCK prefix.
-    this.rep = false;       // Can be used with REP prefix.
-    this.repz = false;      // Can be used with REPE/REPZ prefix.
-    this.repnz = false;     // Can be used with REPNE/REPNZ prefix.
-    this.xcr = "";          // Reads or writes to/from XCR register.
+    this.implicit = false;    // Uses implicit operands (registers / memory).
+    this.lock = false;        // Can be used with LOCK prefix.
+    this.rep = false;         // Can be used with REP prefix.
+    this.repz = false;        // Can be used with REPE/REPZ prefix.
+    this.repnz = false;       // Can be used with REPNE/REPNZ prefix.
+    this.xcr = "";            // Reads or writes to/from XCR register.
 
-    this.volatile = false;  // Volatile instruction hint for the instruction scheduler.
-    this.privilege = 3;     // Privilege level required to execute the instruction.
+    this.volatile = false;    // Volatile instruction hint for the instruction scheduler.
+    this.privilege = 3;       // Privilege level required to execute the instruction.
 
-    this.fpuTop = 0;        // FPU top index manipulation [-1, 0, 1, 2].
-    this.fpu = false;       // If the instruction is an FPU instruction.
-    this.mmx = false;       // If the instruction is an MMX instruction.
+    this.fpuTop = 0;          // FPU top index manipulation [-1, 0, 1, 2].
+    this.fpu = false;         // If the instruction is an FPU instruction.
+    this.mmx = false;         // If the instruction is an MMX instruction.
 
-    this.vsibReg = "";      // AVX VSIB register type (xmm/ymm/zmm).
-    this.vsibSize = -1;     // AVX VSIB register size (32/64).
+    this.vsibReg = "";        // AVX VSIB register type (xmm/ymm/zmm).
+    this.vsibSize = -1;       // AVX VSIB register size (32/64).
 
-    this.broadcast = false; // AVX-512 broadcast support.
-    this.bcstSize = -1;     // AVX-512 broadcast size.
+    this.broadcast = false;   // AVX-512 broadcast support.
+    this.bcstSize = -1;       // AVX-512 broadcast size.
 
-    this.kmask = false;     // AVX-512 merging {k}.
-    this.zmask = false;     // AVX-512 zeroing {kz}, implies {k}.
-    this.sae = false;       // AVX-512 suppress all exceptions {sae} support.
-    this.rnd = false;       // AVX-512 embedded rounding {er}, implies {sae}.
+    this.kmask = false;       // AVX-512 merging {k}.
+    this.zmask = false;       // AVX-512 zeroing {kz}, implies {k}.
+    this.sae = false;         // AVX-512 suppress all exceptions {sae} support.
+    this.rnd = false;         // AVX-512 embedded rounding {er}, implies {sae}.
 
-    this.tupleType = "";    // AVX-512 tuple-type.
-    this.elementSize = -1;  // Instruction's element size.
-    this.invalid = 0;       // Number of problems detected by X86DataBase.
-    this.cpu = dict();      // CPU features required to execute the instruction.
-    this.eflags = dict();   // CPU flags read/written/zeroed/set/undefined.
-    this.operands = [];     // Instruction operands array.
+    this.tupleType = "";      // AVX-512 tuple-type.
+    this.elementSize = -1;    // Instruction's element size.
+    this.invalid = 0;         // Number of problems detected by asmdb.x86.DB.
+    this.cpu = dict();        // CPU features required to execute the instruction.
+    this.eflags = dict();     // CPU flags read/written/zeroed/set/undefined.
+    this.operands = [];       // Instruction operands array.
 
     this.assignOperands(operands);
     this.assignEncoding(encoding);
@@ -419,8 +440,7 @@ class X86Instruction {
   }
 
   assignOperands(s) {
-    if (!s)
-      return;
+    if (!s) return;
 
     // First remove all flags specified as {...}. We put them into `flags`
     // map and mix with others. This seems to be the best we can do here.
@@ -437,10 +457,10 @@ class X86Instruction {
     }
 
     // Split into individual operands and push them to `operands`.
-    var parts = s.split(",");
+    var parts = Utils.splitOperands(s);
     for (var i = 0; i < parts.length; i++) {
-      var data = parts[i].trim();
-      var operand = new X86Operand(data, i === 0 ? "X" : "R");
+      var data = parts[i];
+      var operand = new Operand(data, i === 0 ? "X" : "R");
 
       // Propagate broadcast.
       if (operand.bcstSize > 0)
@@ -531,7 +551,7 @@ class X86Instruction {
 
         // Parse immediate byte, word, dword, or qword.
         if (/^(?:ib|iw|id|iq|\/is4)$/.test(comp)) {
-          this.imm += misc.immSize(comp);
+          this.imm += Utils.immSize(comp);
           continue;
         }
 
@@ -620,7 +640,7 @@ class X86Instruction {
 
         // Parse immediate byte, word, dword, or qword.
         if (/^(?:ib|iw|id|iq)$/.test(comp)) {
-          this.imm += misc.immSize(comp);
+          this.imm += Utils.immSize(comp);
           continue;
         }
 
@@ -724,7 +744,7 @@ class X86Instruction {
   // Validate the instruction's definition. Common mistakes can be checked and
   // reported easily, however, if the mistake is just an invalid opcode or
   // something else it's impossible to detect.
-  validate() {
+  postValidate() {
     var isValid = true;
     var immCount = this.getImmCount();
 
@@ -766,76 +786,37 @@ class X86Instruction {
   }
 
   report(msg) {
-    console.log(`[X86Instruction:${this.name} ${this.operands.join(" ")}] ${msg}`);
+    console.log(`asmdb.x86.Instruction: ${this}: ${msg}`);
     this.invalid++;
   }
+
+  toString() {
+    return `${this.name} ${this.operands.join(", ")}`;
+  }
 }
-exports.X86Instruction = X86Instruction;
+x86.Instruction = Instruction;
 
 // ============================================================================
-// [X86DataBase]
+// [asmdb.x86.DB]
 // ============================================================================
 
-// X86 instruction database - stores X86Instruction instances in a map and
+// X86/X64 instruction database - stores Instruction instances in a map and
 // aggregates all instructions with the same name.
-class X86DataBase {
+class DB extends base.BaseDB {
   constructor() {
-    // Instructions in a map, mapping an instruction name into an array of all
-    // instructions defined for that name.
-    this.map = Object.create(null);
-    this.instructionNames = null;
+    super();
 
-    // Instruction statistics.
-    this.stats = {
-      insts : 0, // Number of all instructions.
-      groups: 0, // Number of grouped instructions (having unique name).
-      vex   : 0, // Number of VEX instructions.
-      xop   : 0, // Number of XOP instructions.
-      evex  : 0  // Number of EVEX instructions.
-    };
+    // Statistics (x86-specific).
+    this.stats.vex  = 0; // Number of VEX instructions.
+    this.stats.xop  = 0; // Number of XOP instructions.
+    this.stats.evex = 0; // Number of EVEX instructions.
   }
 
-  addDefault() {
-    this.addInstructions(x86data.instructions);
-    return this;
+  createInstruction(name, operands, encoding, opcode, flags) {
+    return new Instruction(name, operands, encoding, opcode, flags);
   }
 
-  addInstructions(instructions) {
-    for (var i = 0; i < instructions.length; i++) {
-      const instData = instructions[i];
-      const instNames = instData[kIndexName].split("/");
-
-      for (var j = 0; j < instNames.length; j++) {
-        const instObj = new X86Instruction(
-          instNames[j],
-          instData[kIndexOperands],
-          instData[kIndexEncoding],
-          instData[kIndexOpcode],
-          instData[kIndexFlags]);
-        instObj.validate();
-        this.addInstruction(instObj);
-      }
-    }
-
-    return this;
-  }
-
-  addInstruction(inst) {
-    var group;
-
-    if (hasOwn.call(this.map, inst.name)) {
-      group = this.map[inst.name];
-    }
-    else {
-      group = this.map[inst.name] = [];
-      this.instructionNames = null;
-      this.stats.groups++;
-    }
-
-    group.push(inst);
-    this.stats.insts++;
-
-    // Misc statistics.
+  updateStats(inst) {
     if (inst.prefix === "VEX" ) this.stats.vex++;
     if (inst.prefix === "XOP" ) this.stats.xop++;
     if (inst.prefix === "EVEX") this.stats.evex++;
@@ -843,64 +824,19 @@ class X86DataBase {
     return this;
   }
 
-  getGroup(name) {
-    return this.map[name] || null;
-  }
-
-  getInstructionNames() {
-    const map = this.map;
-
-    var names = this.instructionNames;
-    if (names === null) {
-      names = Object.keys(map);
-      names.sort();
-      this.instructionNames = names;
-    }
-
-    return names;
-  }
-
-  forEach(cb, thisArg) {
-    const map = this.map;
-    const names = this.getInstructionNames();
-
-    for (var i = 0; i < names.length; i++) {
-      const name = names[i];
-      const list = map[name];
-
-      for (var j = 0; j < list.length; j++)
-        cb.call(thisArg, name, list[j]);
-    }
-
+  addDefault() {
+    this.addInstructions(x86data.instructions);
     return this;
-  }
-
-  forEachGroup(cb, thisArg) {
-    const map = this.map;
-    const names = this.getInstructionNames();
-
-    for (var i = 0; i < names.length; i++) {
-      const name = names[i];
-      cb.call(thisArg, name, map[name]);
-    }
-
-    return this;
-  }
-
-  print() {
-    this.forEach(function(name, inst) {
-      console.log(`${inst.name} ${inst.operands.join(", ")} ${inst.opcodeString} [${inst.opcode}]`);
-    }, this);
   }
 }
-exports.X86DataBase = X86DataBase;
+x86.DB = DB;
 
 // ============================================================================
-// [X86DataCheck]
+// [asmdb.x86.X86DataCheck]
 // ============================================================================
 
 class X86DataCheck {
-  checkVexEvex(db) {
+  static checkVexEvex(db) {
     const map = db.map;
     for (var name in map) {
       const insts = map[name];
@@ -928,7 +864,7 @@ class X86DataCheck {
     }
   }
 }
-exports.X86DataCheck = X86DataCheck;
+x86.X86DataCheck = X86DataCheck;
 
 }).apply(this, typeof module === "object" && module && module.exports
-  ? [module, "exports"] : [this.asmdb || (this.asmdb = {}), "x86util"]);
+  ? [module, "exports"] : [this.asmdb || (this.asmdb = {}), "x86"]);

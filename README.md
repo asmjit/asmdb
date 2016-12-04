@@ -1,12 +1,17 @@
 AsmDB
 -----
 
-This is a public domain database of a complete X86/X64 instruction set, from legacy instruction sets to the newest AVX-512.
+This is a public domain database of the following instruction sets:
 
-The file `x64data.js` contains the X86 DATA in a JSON-like format and file `x64util.js` provides utilities to index such data and make it more friendly for additional processing.
+  * X86 and X64 (from legacy instructions up to AVX-512).
+  * ARM (currently only instructions with A32 encoding).
 
-AsmDB provides the following information about each X86/X64 instruction:
+X86 Database
+------------
 
+The file `x86data.js` contains the x86/x64 data in a JSON-like format and file `x86.js` provides utilities to index such data and make it more friendly for additional processing.
+
+X86 database provides the following information about each X86/X64 instruction:
   * Instruction name
   * Instruction operand(s):
     * Specifies always all possible operands for the given encoding & opcode
@@ -40,25 +45,22 @@ AsmDB provides the following information about each X86/X64 instruction:
     * Privilege level:
       * PRIVILEGE=L[0-3] - The instruction's privilege level
 
-The `x86util.js` is designed to index everything that the database provides and to present it in a much more structured form. It's a recommended tool for a post-processing.
+The `x86.js` is designed to index everything that the database provides and to present it in a much more structured form. It's a recommended tool for a post-processing.
 
-Usage Guide
------------
-
-The following snippet shows a basic usage of a `x86util.X86DataBase()`:
+The following snippet shows a basic usage of a `asmdb.x86.DB()`:
 
 ```js
-// This creates an `X86DataBase` instance populated with the data provided by `x86data.js`.
+// This creates an `asmdb.x86.DB` instance populated with the data provided by `x86data.js`.
 const asmdb = require("asmdb");
-const x86db = new asmdb.x86util.X86DataBase().addDefault();
+const x86db = new asmdb.x86.DB().addDefault();
 
 // Returns an array of instruction names stored in the database:
 console.log(x86db.getInstructionNames());
 
 // Iterates over all instructions in the database. Please note that instructions
-// that have different operands but the same name will appear multiple times as
-// specified in the X86/X64 manuals. The `inst` is an `x86util.X86Instruction`
-// instance.
+// that have different operands but the same name (or different encodings) will
+// appear multiple times as specified in the x86/x64 manuals. The `inst` is an
+// `asmdb.x86.Instruction` instance.
 x86db.forEach(function(inst) {
   console.log(`Instruction '{inst.name}' [${inst.encoding}] ${inst.opcodeString}`);
 }, this);
@@ -93,11 +95,11 @@ for (var i = 0; i < names.length; i++) {
 }
 ```
 
-The snippet above just shown how to get instructions and list basic properties. What is more interesting is accessing `x86util.X86Instruction` and `x86util.X86Operand` data.
+The snippet above just shown how to get instructions and list basic properties. What is more interesting is accessing `asmdb.x86.Instruction` and `asmdb.x86.Operand` data.
 
 ```js
 const asmdb = require("asmdb");
-const x86db = new asmdb.x86util.X86DataBase().addDefault();
+const x86db = new asmdb.x86.DB().addDefault();
 
 // Get some instruction (the first in the group):
 const inst = x86db.getGroup("vpunpckhbw")[0];
@@ -154,7 +156,7 @@ The stringified instruction would print something like this (with added comments
   "rnd": false,                    // AVX-512 embedded rounding {er}, implies {sae}.
   "tupleType": "",                 // AVX-512 tuple-type.
   "elementSize": -1,               // Instruction element size (used by broadcast).
-  "invalid": 0,                    // Number of problems detected by X86DataBase.
+  "invalid": 0,                    // Number of problems detected by asmdb.x86.DB.
 
   // CPU flags required to execute the instruction:
   "cpu": {
@@ -227,3 +229,7 @@ The stringified instruction would print something like this (with added comments
 }
 ```
 
+ARM Database
+------------
+
+TO BE DOCUMENTED...
