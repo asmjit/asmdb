@@ -1,10 +1,10 @@
 AsmDB
 -----
 
-This is a public domain database of the following instruction sets:
+This is a public domain instruction-set database that contains the following architectures:
 
-  * X86 and X64 (from legacy instructions up to AVX-512).
-  * ARM (currently only instructions with A32 encoding).
+  * X86 (X86/X64) (from legacy instructions up to AVX-512).
+  * ARM (T16/T32/A32/A64) (work-in-progress).
 
 X86 Database
 ------------

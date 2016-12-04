@@ -4,7 +4,7 @@
   "license": "Unlicense",
   "engines": { "node": ">=4" },
 
-  "description": "X86/X64 instruction database and utilities.",
+  "description": "X86/ARM instruction database and utilities.",
   "keywords": [
     "asm", "assembler",
     "arm", "thumb", "aarch32", "aarch64",
