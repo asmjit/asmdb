@@ -457,10 +457,10 @@ class Instruction {
     }
 
     // Split into individual operands and push them to `operands`.
-    var parts = Utils.splitOperands(s);
+    const parts = Utils.splitOperands(s);
     for (var i = 0; i < parts.length; i++) {
-      var data = parts[i];
-      var operand = new Operand(data, i === 0 ? "X" : "R");
+      const data = parts[i];
+      const operand = new Operand(data, i === 0 ? "X" : "R");
 
       // Propagate broadcast.
       if (operand.bcstSize > 0)
