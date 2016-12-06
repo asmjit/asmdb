@@ -147,14 +147,9 @@ x86.Utils = Utils;
 // ============================================================================
 
 // X86/X64 operand.
-class Operand {
-  constructor(data, defaultAccess) {
-    this.data = data;       // The operand's data (possibly processed).
-    this.type = "";         // Type of the operand ("reg", "mem", "reg/mem", "imm", "rel").
-
-    this.read = false;      // True if the operand is a read-op (R or X) from reg/mem.
-    this.write = false;     // True if the operand is a write-op (W or X) to reg/mem.
-    this.implicit = false;  // True if the operand is an implicit register (not encoded in binary).
+class Operand extends base.BaseOperand {
+  constructor(def, defaultAccess) {
+    super(def);
 
     this.reg = "";          // Register operand's definition.
     this.regType = "";      // Register operand's type.
@@ -177,7 +172,8 @@ class Operand {
     const type = [];
 
     // Handle RWX decorators prefix in "R|W|X[A:B]:" format.
-    var m = /^(R|W|X)(\[(\d+)\:(\d+)\])?\:/.exec(data);
+    var s = def;
+    var m = /^(R|W|X)(\[(\d+)\:(\d+)\])?\:/.exec(s);
     if (m) {
       // RWX:
       this.setAccess(m[1]);
@@ -192,31 +188,31 @@ class Operand {
       }
 
       // Remove RWX information from the operand's string.
-      data = data.substr(m[0].length);
+      s = s.substr(m[0].length);
     }
     else {
       this.setAccess(defaultAccess);
     }
 
     // Handle AVX-512 broadcast possibility specified as "/bN" suffix.
-    m = /\/b(\d+)/.exec(data);
+    m = /\/b(\d+)/.exec(s);
     if (m) {
       this.bcstSize = parseInt(m[1], 10);
 
       // Remove broadcast from the operand's definition; it's not needed anymore.
-      data = data.substr(0, m.index) + data.substr(m.index + m[0].length);
+      s = s.substr(0, m.index) + s.substr(m.index + m[0].length);
     }
 
     // Handle an implicit operand.
-    if (data.charAt(0) === "<" && data.charAt(data.length - 1) === ">") {
+    if (s.charAt(0) === "<" && s.charAt(s.length - 1) === ">") {
       this.implicit = true;
 
       // Remove "<...>" from the operand's definition.
-      data = data.substring(1, data.length - 1);
+      s = s.substring(1, s.length - 1);
     }
 
     // Support multiple operands separated by "/" (only used by r/m style definition).
-    var ops = data.split("/");
+    var ops = s.split("/");
     for (var i = 0; i < ops.length; i++) {
       var op = ops[i].trim();
 
@@ -277,7 +273,7 @@ class Operand {
 
     // In case the data has been modified it's always better to use the stripped off
     // version as we have already processed and stored all the possible decorators.
-    this.data = data;
+    this.data = s;
     this.type = type.join("/");
   }
 
@@ -314,17 +310,17 @@ x86.Operand = Operand;
 // ============================================================================
 
 // X86/X64 instruction.
-class Instruction {
-  constructor(name, operands, encoding, opcode, flags) {
-    this.name = name;         // Instruction name.
-    this.arch = "ANY";        // Architecture - ANY, X86, X64.
-    this.encoding = "";       // Instruction encoding.
+class Instruction extends base.BaseInstruction {
+  constructor(name, operands, encoding, opcode, metadata) {
+    super();
+    this.assignData(name, operands, encoding, opcode, metadata);
+  }
 
+  assignData(name, operands, encoding, opcode, metadata) {
+    this.name = name;         // Instruction name.
     this.prefix = "";         // Prefix - "", "3DNOW", "EVEX", "VEX", "XOP".
 
-    this.opcode = "";         // A single opcode byte as a hex string, "00-FF".
-    this.opcodeInt = 0;       // A single opcode byte as an integer (0..255).
-    this.opcodeString = "";   // The whole opcode string, as specified in manual.
+    this.opcodeHex = "";      // A single opcode byte as hexadecimal string "00-FF".
 
     this.l = "";              // Opcode L field (nothing, 128, 256, 512).
     this.w = "";              // Opcode W field.
@@ -338,14 +334,12 @@ class Instruction {
     this.ri = false;          // Instruction opcode is combined with register, "XX+r" or "XX+i".
     this.rel = 0;             // Displacement (cb cw cd parts).
 
-    this.implicit = false;    // Uses implicit operands (registers / memory).
     this.lock = false;        // Can be used with LOCK prefix.
     this.rep = false;         // Can be used with REP prefix.
     this.repz = false;        // Can be used with REPE/REPZ prefix.
     this.repnz = false;       // Can be used with REPNE/REPNZ prefix.
     this.xcr = "";            // Reads or writes to/from XCR register.
 
-    this.volatile = false;    // Volatile instruction hint for the instruction scheduler.
     this.privilege = 3;       // Privilege level required to execute the instruction.
 
     this.fpuTop = 0;          // FPU top index manipulation [-1, 0, 1, 2].
@@ -372,71 +366,9 @@ class Instruction {
 
     this.assignOperands(operands);
     this.assignEncoding(encoding);
-
     this.assignOpcode(opcode);
-    this.assignFlags(flags);
-  }
-
-  isAVX() { return this.isVEX() || this.isEVEX(); }
-  isVEX() { return this.prefix === "VEX" || this.prefix === "XOP"; }
-  isEVEX() { return this.prefix === "EVEX" }
-
-  getWValue() {
-    switch (this.w) {
-      case "W0": return 0;
-      case "W1": return 1;
-    }
-    return -1;
-  }
-
-  // Get signature of the instruction in an "ARCH PREFIX ENCODING[:operands]" form.
-  getSignature() {
-    var operands = this.operands;
-    var sign = this.arch;
-
-    if (this.prefix) {
-      sign += " " + this.prefix;
-      if (this.prefix !== "3DNOW") {
-        if (this.l === "L1")
-          sign += ".256";
-        else if (this.l === "256" || this.l === "512")
-          sign += `.${this.l}`;
-        else
-          sign += ".128";
-
-        if (this.w === "W1")
-          sign += ".W";
-      }
-    }
-    else if (this.w === "W1") {
-      sign += " REX.W";
-    }
-
-    sign += " " + this.encoding;
-
-    for (var i = 0; i < operands.length; i++) {
-      sign += (i === 0) ? ":" : ",";
-
-      var operand = operands[i];
-      if (operand.implicit)
-        sign += `[${operand.reg}]`;
-      else
-        sign += operand.toRegMem();
-    }
-
-    return sign;
-  }
-
-  getImmCount() {
-    var ops = this.operands;
-    var n = 0;
-
-    for (var i = 0; i < ops.length; i++) {
-      if (ops[i] === "imm")
-        n++;
-    }
-
-    return n;
+    this.assignMetadata(metadata);
+    this.postValidate();
   }
 
   assignOperands(s) {
@@ -457,10 +389,10 @@ class Instruction {
     }
 
     // Split into individual operands and push them to `operands`.
-    const parts = Utils.splitOperands(s);
-    for (var i = 0; i < parts.length; i++) {
-      const data = parts[i];
-      const operand = new Operand(data, i === 0 ? "X" : "R");
+    const arr = Utils.splitOperands(s);
+    for (var i = 0; i < arr.length; i++) {
+      const opstr = arr[i];
+      const operand = new Operand(opstr, i === 0 ? "X" : "R");
 
       // Propagate broadcast.
       if (operand.bcstSize > 0)
@@ -539,7 +471,7 @@ class Instruction {
 
         // Parse opcode.
         if (/^[0-9A-Fa-f]{2}$/.test(comp)) {
-          this.opcode = comp.toUpperCase();
+          this.opcodeHex = comp.toUpperCase();
           continue;
         }
 
@@ -598,9 +530,9 @@ class Instruction {
           }
 
           // Some instructions have form 0F AE XX, we treat the last byte as an opcode.
-          if (this.mm === "0F" && this.opcode === "AE") {
-            this.mm += this.opcode;
-            this.opcode = comp;
+          if (this.mm === "0F" && this.opcodeHex === "AE") {
+            this.mm += this.opcodeHex;
+            this.opcodeHex = comp;
             continue;
           }
 
@@ -609,26 +541,26 @@ class Instruction {
           // instruction tables to allow storing this prefix together with other "MM"
           // prefixes, currently the unused indexes are used, but if X86 moves forward
           // and starts using these we can simply use more bits in the opcode DWORD.
-          if (!this.pp && this.opcode === "9B") {
-            this.pp = this.opcode;
-            this.opcode = comp;
+          if (!this.pp && this.opcodeHex === "9B") {
+            this.pp = this.opcodeHex;
+            this.opcodeHex = comp;
             continue;
           }
 
-          if (!this.mm && (/^(?:D8|D9|DA|DB|DC|DD|DE|DF)$/.test(this.opcode))) {
-            this.mm = this.opcode;
-            this.opcode = comp;
+          if (!this.mm && (/^(?:D8|D9|DA|DB|DC|DD|DE|DF)$/.test(this.opcodeHex))) {
+            this.mm = this.opcodeHex;
+            this.opcodeHex = comp;
             continue;
           }
 
-          if (this.opcode) {
-            if (this.opcode === "67")
+          if (this.opcodeHex) {
+            if (this.opcodeHex === "67")
               this._67h = true;
             else
-              this.report(`'${this.opcodeString}' Multiple opcodes, have ${this.opcode}, found ${comp}`);
+              this.report(`'${this.opcodeString}' Multiple opcodes, have ${this.opcodeHex}, found ${comp}`);
           }
 
-          this.opcode = comp;
+          this.opcodeHex = comp;
           continue;
         }
 
@@ -656,22 +588,22 @@ class Instruction {
     }
 
     // HACK: Fix instructions having opcode "01".
-    if (this.opcode === "" && this.mm.indexOf("0F01") === this.mm.length - 4) {
-      this.opcode = "01";
+    if (this.opcodeHex === "" && this.mm.indexOf("0F01") === this.mm.length - 4) {
+      this.opcodeHex = "01";
       this.mm = this.mm.substr(0, this.mm.length - 2);
     }
 
-    if (this.opcode)
-      this.opcodeInt = parseInt(this.opcode, 16);
+    if (this.opcodeHex)
+      this.opcodeValue = parseInt(this.opcodeHex, 16);
 
     if (/^\/[0-7]$/.test(this.rm))
       this.rmInt = parseInt(this.rm.substr(1), 10);
 
-    if (!this.opcode)
-      this.report(`'${this.opcodeString}' Couldn't parse instruction's opcode`);
+    if (!this.opcodeHex)
+      this.report(`Couldn't parse instruction's opcode '${this.opcodeString}'`);
   }
 
-  assignFlags(s) {
+  assignMetadata(s) {
     // Parse individual flags separated by spaces.
     var flags = s.split(" ");
 
@@ -705,7 +637,7 @@ class Instruction {
       case "LOCK"     : this.lock     = true; return;
       case "REP"      : this.rep      = true; return;
       case "REPZ"     : this.repz     = true; return;
-      case "REPNZ"    : this.repnz     = true; return;
+      case "REPNZ"    : this.repnz    = true; return;
       case "FPU"      : this.fpu      = true; return;
       case "XCR"      : this.xcr      = value; return;
 
@@ -756,7 +688,7 @@ class Instruction {
     if (immCount > 0) {
       var immEncoding = "I".repeat(immCount);
 
-      // "I" or "II" should be part of the instruction encoding.
+      // "I" or "II" should be part of the encoding.
       if (this.encoding.indexOf(immEncoding) === -1) {
         isValid = false;
         this.report(`Immediate(s) [${immCount}] missing in encoding: ${this.encoding}`);
@@ -785,13 +717,71 @@ class Instruction {
     return isValid;
   }
 
+  isAVX() { return this.isVEX() || this.isEVEX(); }
+  isVEX() { return this.prefix === "VEX" || this.prefix === "XOP"; }
+  isEVEX() { return this.prefix === "EVEX" }
+
+  getWValue() {
+    switch (this.w) {
+      case "W0": return 0;
+      case "W1": return 1;
+    }
+    return -1;
+  }
+
+  // Get signature of the instruction as "ARCH PREFIX ENCODING[:operands]" form.
+  getSignature() {
+    var operands = this.operands;
+    var sign = this.arch;
+
+    if (this.prefix) {
+      sign += " " + this.prefix;
+      if (this.prefix !== "3DNOW") {
+        if (this.l === "L1")
+          sign += ".256";
+        else if (this.l === "256" || this.l === "512")
+          sign += `.${this.l}`;
+        else
+          sign += ".128";
+
+        if (this.w === "W1")
+          sign += ".W";
+      }
+    }
+    else if (this.w === "W1") {
+      sign += " REX.W";
+    }
+
+    sign += " " + this.encoding;
+
+    for (var i = 0; i < operands.length; i++) {
+      sign += (i === 0) ? ":" : ",";
+
+      var operand = operands[i];
+      if (operand.implicit)
+        sign += `[${operand.reg}]`;
+      else
+        sign += operand.toRegMem();
+    }
+
+    return sign;
+  }
+
+  getImmCount() {
+    var ops = this.operands;
+    var n = 0;
+
+    for (var i = 0; i < ops.length; i++) {
+      if (ops[i] === "imm")
+        n++;
+    }
+
+    return n;
+  }
+
   report(msg) {
     console.log(`asmdb.x86.Instruction: ${this}: ${msg}`);
     this.invalid++;
-  }
-
-  toString() {
-    return `${this.name} ${this.operands.join(", ")}`;
   }
 }
 x86.Instruction = Instruction;
@@ -805,23 +795,10 @@ x86.Instruction = Instruction;
 class DB extends base.BaseDB {
   constructor() {
     super();
-
-    // Statistics (x86-specific).
-    this.stats.vex  = 0; // Number of VEX instructions.
-    this.stats.xop  = 0; // Number of XOP instructions.
-    this.stats.evex = 0; // Number of EVEX instructions.
   }
 
-  createInstruction(name, operands, encoding, opcode, flags) {
-    return new Instruction(name, operands, encoding, opcode, flags);
-  }
-
-  updateStats(inst) {
-    if (inst.prefix === "VEX" ) this.stats.vex++;
-    if (inst.prefix === "XOP" ) this.stats.xop++;
-    if (inst.prefix === "EVEX") this.stats.evex++;
-
-    return this;
+  createInstruction(name, operands, encoding, opcode, metadata) {
+    return new Instruction(name, operands, encoding, opcode, metadata);
   }
 
   addDefault() {
@@ -848,7 +825,7 @@ class X86DataCheck {
             const vex  = instA.prefix === "VEX"  ? instA : instB.prefix === "VEX"  ? instB : null;
             const evex = instA.prefix === "EVEX" ? instA : instB.prefix === "EVEX" ? instB : null;
 
-            if (vex && evex && vex.opcode === evex.opcode) {
+            if (vex && evex && vex.opcodeHex === evex.opcodeHex) {
               // NOTE: There are some false positives, they will be printed as well.
               var ok = vex.w === evex.w && vex.l === evex.l;
 

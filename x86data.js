@@ -4,13 +4,21 @@
 // [License]
 // Public Domain.
 
+
+// This file can be parsed as pure JSON, locate ${JSON:BEGIN} and ${JSON:END}
+// marks and strip everything outside, a sample JS function that would do the job:
+//
+// function strip(s) {
+//   return s.replace(/(^.*\$\{JSON:BEGIN\}\s+)|(\/\/\s*\$\{JSON:END\}\s*.*$)/g, "");
+// }
+
+
 // DESCRIPTION
 // -----------
 //
-// These tables can be used for any purpose. The idea is to have an instruction
-// database that can be used to generate tables needed by assemblers and disasm
-// engines, and also to have data that can be used to generate instruction tables
-// for developers.
+// These tables can be used for any purpose. The idea is to have an instruction DB
+// that can be used to generate tables used by assemblers and disassemblers, and
+// also to have data that can be used to generate instruction tables for developers.
 
 
 // INSTRUCTIONS
@@ -21,8 +29,8 @@
 //   [0] - Instruction name.
 //   [1] - Instruction operands.
 //   [2] - Instruction encoding.
-//   [3] - Instruction opcodes.
-//   [4] - Instruction tags - CPU requirements, EFLAGS (read/write), and other metadata.
+//   [3] - Instruction opcode.
+//   [4] - Instruction metadata - CPU requirements, EFLAGS (read/write), and other metadata.
 //
 // The definition tries to match Intel and AMD instruction set manuals, but there
 // are small differences to make the definition more informative and compact.
@@ -85,14 +93,16 @@
 (function($export, $as) {
 "use strict";
 
-$export[$as] = {
-  architectures: [
+$export[$as] =
+// ${JSON:BEGIN}
+{
+  "architectures": [
     "ANY",
     "X86",
     "X64"
   ],
 
-  features: [
+  "features": [
     "3DNOW",
     "3DNOW2",
     "ADX",
@@ -157,27 +167,26 @@ $export[$as] = {
     "XSAVE_OPT"
   ],
 
-  registers: {
-    "r8"  : { kind: "gp"  , any: "r8"   , names: ["al", "cl", "dl", "bl", "spl", "bpl", "sil", "dil", "r8-15b"] },
-    "r8hi": { kind: "gp"                , names: ["ah", "ch", "dh", "bh"] },
-    "r16" : { kind: "gp"  , any: "r16"  , names: ["ax", "cx", "dx", "bx", "sp", "bp", "si", "di", "r8-15w"] },
-    "r32" : { kind: "gp"  , any: "r32"  , names: ["eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi", "r8-15d"] },
-    "r64" : { kind: "gp"  , any: "r64"  , names: ["rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8-15"] },
-    "rxx" : { kind: "gp"                , names: ["zax", "zcx", "zdx", "zbx", "zsp", "zbp", "zsi", "zdi"] },
-    "sreg": { kind: "sreg", any: "sreg" , names: ["es", "cs", "ss", "ds", "fs", "gs" ] },
-    "creg": { kind: "creg", any: "creg" , names: ["cr0-15"]  },
-    "dreg": { kind: "dreg", any: "dreg" , names: ["dr0-15"]  },
-    "bnd" : { kind: "bnd" , any: "bnd"  , names: ["bnd0-3"]  },
-    "st"  : { kind: "st"  , any: "st(i)", names: ["st(0-7)"] },
-    "mm"  : { kind: "mm"  , any: "mm"   , names: ["mm0-7"]   },
-    "k"   : { kind: "k"   , any: "k"    , names: ["k0-7"]    },
-    "xmm" : { kind: "vec" , any: "xmm"  , names: ["xmm0-31"] },
-    "ymm" : { kind: "vec" , any: "ymm"  , names: ["ymm0-31"] },
-    "zmm" : { kind: "vec" , any: "zmm"  , names: ["zmm0-31"] }
+  "registers": {
+    "r8"  : { "kind": "gp"  , "any": "r8"   , "names": ["al", "cl", "dl", "bl", "spl", "bpl", "sil", "dil", "r8-15b"] },
+    "r8hi": { "kind": "gp"                  , "names": ["ah", "ch", "dh", "bh"] },
+    "r16" : { "kind": "gp"  , "any": "r16"  , "names": ["ax", "cx", "dx", "bx", "sp", "bp", "si", "di", "r8-15w"] },
+    "r32" : { "kind": "gp"  , "any": "r32"  , "names": ["eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi", "r8-15d"] },
+    "r64" : { "kind": "gp"  , "any": "r64"  , "names": ["rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8-15"] },
+    "rxx" : { "kind": "gp"                  , "names": ["zax", "zcx", "zdx", "zbx", "zsp", "zbp", "zsi", "zdi"] },
+    "sreg": { "kind": "sreg", "any": "sreg" , "names": ["es", "cs", "ss", "ds", "fs", "gs" ] },
+    "creg": { "kind": "creg", "any": "creg" , "names": ["cr0-15"]  },
+    "dreg": { "kind": "dreg", "any": "dreg" , "names": ["dr0-15"]  },
+    "bnd" : { "kind": "bnd" , "any": "bnd"  , "names": ["bnd0-3"]  },
+    "st"  : { "kind": "st"  , "any": "st(i)", "names": ["st(0-7)"] },
+    "mm"  : { "kind": "mm"  , "any": "mm"   , "names": ["mm0-7"]   },
+    "k"   : { "kind": "k"   , "any": "k"    , "names": ["k0-7"]    },
+    "xmm" : { "kind": "vec" , "any": "xmm"  , "names": ["xmm0-31"] },
+    "ymm" : { "kind": "vec" , "any": "ymm"  , "names": ["ymm0-31"] },
+    "zmm" : { "kind": "vec" , "any": "zmm"  , "names": ["zmm0-31"] }
   },
 
-  instructions: [
-    // X86/X64.
+  "instructions": [
     ["aaa"              , "<ax>"                                     , "NONE"    , "37"                               , "X86 OF=U SF=U ZF=U AF=W PF=U CF=W"],
     ["aas"              , "<ax>"                                     , "NONE"    , "3F"                               , "X86 OF=U SF=U ZF=U AF=W PF=U CF=W"],
     ["aad"              , "<ax>, ib"                                 , "I"       , "D5 ib"                            , "X86 OF=U SF=W ZF=W AF=U PF=W CF=U"],
@@ -1176,13 +1185,11 @@ $export[$as] = {
     ["fyl2x"            , ""                                         , "NONE"    , "D9 F1"                            , "ANY FPU_POP    C0=U C1=W C2=U C3=U"],
     ["fyl2xp1"          , ""                                         , "NONE"    , "D9 F9"                            , "ANY FPU_POP    C0=U C1=W C2=U C3=U"],
 
-    // FXSR.
     ["fxrstor"          , "mem"                                      , "NONE"    , "0F AE /1"                         , "ANY VOLATILE FXSR C0=W C1=W C2=W C3=W"],
     ["fxrstor64"        , "mem"                                      , "NONE"    , "REX.W 0F AE /1"                   , "X64 VOLATILE FXSR C0=W C1=W C2=W C3=W"],
     ["fxsave"           , "mem"                                      , "NONE"    , "0F AE /0"                         , "ANY VOLATILE FXSR"],
     ["fxsave64"         , "mem"                                      , "NONE"    , "REX.W 0F AE /0"                   , "X64 VOLATILE FXSR"],
 
-    // ADX / BMI / *CNT.
     ["adcx"             , "r32, r32/m32"                             , "RM"      , "66 0F 38 F6 /r"                   , "ANY ADX CF=X"],
     ["adcx"             , "r64, r64/m64"                             , "RM"      , "REX.W 66 0F 38 F6 /r"             , "X64 ADX CF=X"],
     ["adox"             , "r32, r32/m32"                             , "RM"      , "F3 0F 38 F6 /r"                   , "ANY ADX OF=X"],
@@ -1223,7 +1230,6 @@ $export[$as] = {
     ["tzcnt"            , "W:r32, r32/m32"                           , "RM"      , "F3 0F BC /r"                      , "ANY BMI OF=U SF=U ZF=W AF=U PF=U CF=W"],
     ["tzcnt"            , "W:r64, r64/m64"                           , "RM"      , "REX.W F3 0F BC /r"                , "X64 BMI OF=U SF=U ZF=W AF=U PF=U CF=W"],
 
-    // TBM.
     ["blci"             , "W:r32, r32/m32"                           , "VM"      , "XOP.NDD.LZ.M9.W0 02 /6"           , "ANY TBM"],
     ["blci"             , "W:r64, r64/m64"                           , "VM"      , "XOP.NDD.LZ.M9.W1 02 /6"           , "X64 TBM"],
     ["blcic"            , "W:r32, r32/m32"                           , "VM"      , "XOP.NDD.LZ.M9.W0 01 /5"           , "ANY TBM"],
@@ -1243,14 +1249,12 @@ $export[$as] = {
     ["t1mskc"           , "W:r32, r32/m32"                           , "VM"      , "XOP.NDD.LZ.M9.W0 01 /7"           , "ANY TBM"],
     ["t1mskc"           , "W:r64, r64/m64"                           , "VM"      , "XOP.NDD.LZ.M9.W1 01 /7"           , "X64 TBM"],
 
-    // CRC32.
     ["crc32"            , "r32, r8/m8"                               , "RM"      , "F2 0F 38 F0 /r"                   , "ANY SSE4_2"],
     ["crc32"            , "r32, r16/m16"                             , "RM"      , "66 F2 0F 38 F1 /r"                , "ANY SSE4_2"],
     ["crc32"            , "r32, r32/m32"                             , "RM"      , "F2 0F 38 F1 /r"                   , "ANY SSE4_2"],
     ["crc32"            , "r64, r8/m8"                               , "RM"      , "REX.W F2 0F 38 F0 /r"             , "X64 SSE4_2"],
     ["crc32"            , "r64, r64/m64"                             , "RM"      , "REX.W F2 0F 38 F1 /r"             , "X64 SSE4_2"],
 
-    // MOVBE.
     ["movbe"            , "W[7:0]:r16, m16"                          , "RM"      , "66 0F 38 F0 /r"                   , "ANY MOVBE"],
     ["movbe"            , "W[7:0]:r32, m32"                          , "RM"      , "0F 38 F0 /r"                      , "ANY MOVBE"],
     ["movbe"            , "W[7:0]:r64, m64"                          , "RM"      , "REX.W 0F 38 F0 /r"                , "X64 MOVBE"],
@@ -1258,27 +1262,20 @@ $export[$as] = {
     ["movbe"            , "W:m32, r32"                               , "MR"      , "0F 38 F1 /r"                      , "ANY MOVBE"],
     ["movbe"            , "W:m64, r64"                               , "MR"      , "REX.W 0F 38 F1 /r"                , "X64 MOVBE"],
 
-    // CLFLUSH / CLFLUSH_OPT.
     ["clflush"          , "R:mem"                                    , "M"       , "0F AE /7"                         , "ANY VOLATILE CLFLUSH"],
     ["clflushopt"       , "R:mem"                                    , "M"       , "66 0F AE /7"                      , "ANY VOLATILE CLFLUSH_OPT"],
 
-    // PREFETCHW / PREFETCHWT1.
     ["prefetchw"        , "R:mem"                                    , "M"       , "0F 0D /1"                         , "ANY PREFETCHW OF=U SF=U ZF=U AF=U PF=U CF=U"],
     ["prefetchwt1"      , "R:mem"                                    , "M"       , "0F 0D /2"                         , "ANY PREFETCHWT1 OF=U SF=U ZF=U AF=U PF=U CF=U"],
 
-    // CLWB / PCOMMIT.
     ["clwb"             , "R:mem"                                    , "M"       , "66 0F AE /6"                      , "ANY CLWB"],
     ["pcommit"          , ""                                         , "NONE"    , "66 0F AE F8"                      , "ANY PCOMMIT"],
 
-    // CLZERO.
-
     ["clzero"           , "R:<ds:zax>"                               , "NONE"    , "0F 01 FC"                         , "ANY CLZERO"],
 
-    // RDTSC/RDTSCP.
     ["rdtsc"            , "W:<edx>, W:<eax>"                         , "NONE"    , "0F 31"                            , "ANY VOLATILE RDTSC"],
     ["rdtscp"           , "W:<edx>, W:<eax>, W:<ecx>"                , "NONE"    , "0F 01 F9"                         , "ANY VOLATILE RDTSCP"],
 
-    // FSGSBASE.
     ["rdfsbase"         , "W:r32"                                    , "M"       , "F3 0F AE /0"                      , "X64 VOLATILE FSGSBASE"],
     ["rdfsbase"         , "W:r64"                                    , "M"       , "REX.W F3 0F AE /0"                , "X64 VOLATILE FSGSBASE"],
     ["rdgsbase"         , "W:r32"                                    , "M"       , "F3 0F AE /1"                      , "X64 VOLATILE FSGSBASE"],
@@ -1288,7 +1285,6 @@ $export[$as] = {
     ["wrgsbase"         , "R:r32"                                    , "M"       , "F3 0F AE /3"                      , "X64 VOLATILE FSGSBASE"],
     ["wrgsbase"         , "R:r64"                                    , "M"       , "REX.W F3 0F AE /3"                , "X64 VOLATILE FSGSBASE"],
 
-    // RDRAND / RDSEED.
     ["rdrand"           , "W:r16"                                    , "M"       , "66 0F C7 /6"                      , "ANY RDRAND OF=0 SF=0 ZF=0 AF=0 PF=0 CF=W"],
     ["rdrand"           , "W:r32"                                    , "M"       , "0F C7 /6"                         , "ANY RDRAND OF=0 SF=0 ZF=0 AF=0 PF=0 CF=W"],
     ["rdrand"           , "W:r64"                                    , "M"       , "REX.W 0F C7 /6"                   , "X64 RDRAND OF=0 SF=0 ZF=0 AF=0 PF=0 CF=W"],
@@ -1296,7 +1292,6 @@ $export[$as] = {
     ["rdseed"           , "W:r32"                                    , "M"       , "0F C7 /7"                         , "ANY RDSEED OF=0 SF=0 ZF=0 AF=0 PF=0 CF=W"],
     ["rdseed"           , "W:r64"                                    , "M"       , "REX.W 0F C7 /7"                   , "X64 RDSEED OF=0 SF=0 ZF=0 AF=0 PF=0 CF=W"],
 
-    // XSAVE.
     ["xgetbv"           , "R:<ecx>, W:<edx>, W:<eax>"                , "NONE"    , "0F 01 D0"                         , "ANY VOLATILE XSAVE XCR=R"],
     ["xsetbv"           , "R:<ecx>, R:<edx>, R:<eax>"                , "NONE"    , "0F 01 D1"                         , "ANY VOLATILE XSAVE XCR=W PRIVILEGE=L0"],
 
@@ -1313,7 +1308,6 @@ $export[$as] = {
     ["xsaves"           , "mem, <edx>, <eax>"                        , "M"       , "0F C7 /5"                         , "ANY VOLATILE XSAVE XCR=R"],
     ["xsaves64"         , "mem, <edx>, <eax>"                        , "M"       , "REX.W 0F C7 /5"                   , "X64 VOLATILE XSAVE XCR=R"],
 
-    // MPX.
     ["bndcl"            , "R:bnd, r32/m32"                           , "RM"      , "F3 0F 1A /r"                      , "X86 VOLATILE MPX"],
     ["bndcl"            , "R:bnd, r64/m64"                           , "RM"      , "F3 0F 1A /r"                      , "X64 VOLATILE MPX"],
     ["bndcn"            , "R:bnd, r32/m32"                           , "RM"      , "F2 0F 1B /r"                      , "X86 VOLATILE MPX"],
@@ -1326,7 +1320,6 @@ $export[$as] = {
     ["bndmov"           , "W:bnd/mem, bnd"                           , "MR"      , "66 0F 1B /r"                      , "ANY VOLATILE MPX"],
     ["bndstx"           , "W:mib, bnd"                               , "MR"      , "0F 1B /r"                         , "ANY VOLATILE MPX"],
 
-    // MMX & SSE.
     ["addpd"            , "X:xmm, xmm/m128"                          , "RM"      , "66 0F 58 /r"                      , "ANY SSE2"],
     ["addps"            , "X:xmm, xmm/m128"                          , "RM"      , "0F 58 /r"                         , "ANY SSE"],
     ["addsd"            , "X:xmm, xmm/m64"                           , "RM"      , "F2 0F 58 /r"                      , "ANY SSE2"],
@@ -1733,11 +1726,9 @@ $export[$as] = {
     ["xorpd"            , "X:xmm, xmm/m128"                          , "RM"      , "66 0F 57 /r"                      , "ANY SSE2"],
     ["xorps"            , "X:xmm, xmm/m128"                          , "RM"      , "0F 57 /r"                         , "ANY SSE"],
 
-    // MMX & SSE (Aliases).
     ["movq"             , "W:xmm, mm"                                , "RM"      , "F3 0F D6 /r"                      , "ANY SSE2"],
     ["movq"             , "W[7:0]:mm, xmm"                           , "RM"      , "F2 0F D6 /r"                      , "ANY SSE2"],
 
-    // 3DNOW.
     ["femms"            , ""                                         , "NONE"    , "0F 0E"                            , "ANY VOLATILE 3DNOW"],
     ["pavgusb"          , "X:mm, mm/m64"                             , "RM"      , "0F 0F /r BF"                      , "ANY 3DNOW"],
     ["pf2id"            , "W:mm, mm/m64"                             , "RM"      , "0F 0F /r 1D"                      , "ANY 3DNOW"],
@@ -1767,7 +1758,6 @@ $export[$as] = {
     ["prefetch"         , "R:mem"                                    , "M"       , "0F 0D /0"                         , "ANY 3DNOW"],
     ["pswapd"           , "W:mm, mm/m64"                             , "RM"      , "0F 0F /r BB"                      , "ANY 3DNOW2"],
 
-    // AES.
     ["aesdec"           , "X:xmm, xmm/m128"                          , "RM"      , "66 0F 38 DE /r"                   , "ANY AES"],
     ["aesdeclast"       , "X:xmm, xmm/m128"                          , "RM"      , "66 0F 38 DF /r"                   , "ANY AES"],
     ["aesenc"           , "X:xmm, xmm/m128"                          , "RM"      , "66 0F 38 DC /r"                   , "ANY AES"],
@@ -1775,7 +1765,6 @@ $export[$as] = {
     ["aesimc"           , "W:xmm, xmm/m128"                          , "RM"      , "66 0F 38 DB /r"                   , "ANY AES"],
     ["aeskeygenassist"  , "W:xmm, xmm/m128, ib"                      , "RM"      , "66 0F 3A DF /r ib"                , "ANY AES"],
 
-    // SHA.
     ["sha1msg1"         , "xmm, xmm/m128"                            , "RM"      , "0F 38 C9 /r"                      , "ANY SHA"],
     ["sha1msg2"         , "xmm, xmm/m128"                            , "RM"      , "0F 38 CA /r"                      , "ANY SHA"],
     ["sha1nexte"        , "xmm, xmm/m128"                            , "RM"      , "0F 38 C8 /r"                      , "ANY SHA"],
@@ -1784,7 +1773,6 @@ $export[$as] = {
     ["sha256msg2"       , "xmm, xmm/m128"                            , "RM"      , "0F 38 CD /r"                      , "ANY SHA"],
     ["sha256rnds2"      , "xmm, xmm/m128, <xmm0>"                    , "RM"      , "0F 38 CB /r"                      , "ANY SHA"],
 
-    // AVX.
     ["vaddpd"           , "W:xmm, xmm, xmm/m128"                     , "RVM"     , "VEX.NDS.128.66.0F.WIG 58 /r"      , "ANY AVX"],
     ["vaddpd"           , "W:ymm, ymm, ymm/m256"                     , "RVM"     , "VEX.NDS.256.66.0F.WIG 58 /r"      , "ANY AVX"],
     ["vaddps"           , "W:xmm, xmm, xmm/m128"                     , "RVM"     , "VEX.NDS.128.0F.WIG 58 /r"         , "ANY AVX"],
@@ -2358,13 +2346,11 @@ $export[$as] = {
     ["vzeroall"         , ""                                         , "NONE"    , "VEX.256.0F.WIG 77"                , "ANY AVX"],
     ["vzeroupper"       , ""                                         , "NONE"    , "VEX.128.0F.WIG 77"                , "ANY AVX"],
 
-    // F16C.
     ["vcvtph2ps"        , "W:xmm, xmm/m64"                           , "RM"      , "VEX.128.66.0F38.W0 13 /r"         , "ANY F16C"],
     ["vcvtph2ps"        , "W:ymm, xmm/m128"                          , "RM"      , "VEX.256.66.0F38.W0 13 /r"         , "ANY F16C"],
     ["vcvtps2ph"        , "W:xmm/m64, xmm, ib"                       , "MRI"     , "VEX.128.66.0F3A.W0 1D /r ib"      , "ANY F16C"],
     ["vcvtps2ph"        , "W:xmm/m128, ymm, ib"                      , "MRI"     , "VEX.256.66.0F3A.W0 1D /r ib"      , "ANY F16C"],
 
-    // FMA.
     ["vfmadd132pd"      , "X:xmm, xmm, xmm/m128"                     , "RVM"     , "VEX.DDS.128.66.0F38.W1 98 /r"     , "ANY FMA"],
     ["vfmadd132pd"      , "X:ymm, ymm, ymm/m256"                     , "RVM"     , "VEX.DDS.256.66.0F38.W1 98 /r"     , "ANY FMA"],
     ["vfmadd132ps"      , "X:xmm, xmm, xmm/m128"                     , "RVM"     , "VEX.DDS.128.66.0F38.W0 98 /r"     , "ANY FMA"],
@@ -2462,7 +2448,6 @@ $export[$as] = {
     ["vfnmsub231sd"     , "X:xmm, xmm, xmm/m64"                      , "RVM"     , "VEX.DDS.LIG.66.0F38.W1 BF /r"     , "ANY FMA"],
     ["vfnmsub231ss"     , "X:xmm, xmm, xmm/m32"                      , "RVM"     , "VEX.DDS.LIG.66.0F38.W0 BF /r"     , "ANY FMA"],
 
-    // FMA4.
     ["vfmaddpd"         , "W:xmm, xmm, xmm, xmm/m128"                , "RVSM"    , "VEX.NDS.128.66.0F3A.W1 69 /r /is4", "ANY FMA4"],
     ["vfmaddpd"         , "W:xmm, xmm, xmm/m128, xmm"                , "RVMS"    , "VEX.NDS.128.66.0F3A.W0 69 /r /is4", "ANY FMA4"],
     ["vfmaddpd"         , "W:ymm, ymm, ymm, ymm/m256"                , "RVSM"    , "VEX.NDS.256.66.0F3A.W1 69 /r /is4", "ANY FMA4"],
@@ -2528,7 +2513,6 @@ $export[$as] = {
     ["vfnmsubss"        , "W:xmm, xmm, xmm, xmm/m32"                 , "RVSM"    , "VEX.NDS.128.66.0F3A.W1 7E /r /is4", "ANY FMA4"],
     ["vfnmsubss"        , "W:xmm, xmm, xmm/m32, xmm"                 , "RVMS"    , "VEX.NDS.128.66.0F3A.W0 7E /r /is4", "ANY FMA4"],
 
-    // XOP.
     ["vfrczpd"          , "W:xmm, xmm/m128"                          , "RM"      , "XOP.L0.P0.M9.W0 81 /r"            , "ANY XOP"],
     ["vfrczpd"          , "W:ymm, ymm/m256"                          , "RM"      , "XOP.L1.P0.M9.W0 81 /r"            , "ANY XOP"],
     ["vfrczps"          , "W:xmm, xmm/m128"                          , "RM"      , "XOP.L0.P0.M9.W0 80 /r"            , "ANY XOP"],
@@ -2613,7 +2597,6 @@ $export[$as] = {
     ["vpshlw"           , "W:xmm, xmm, xmm/m128"                     , "RVM"     , "XOP.NDS.L0.P0.M9.W1 95 /r"        , "ANY XOP"],
     ["vpshlw"           , "W:xmm, xmm/m128, xmm"                     , "RMV"     , "XOP.NDS.L0.P0.M9.W0 95 /r"        , "ANY XOP"],
 
-    // AVX512.
     ["kaddb"            , "W:k, k, k"                                , "RVM"     , "VEX.L1.66.0F.W0 4A /r"            , "ANY AVX512DQ"],
     ["kaddd"            , "W:k, k, k"                                , "RVM"     , "VEX.L1.66.0F.W1 4A /r"            , "ANY AVX512BW"],
     ["kaddq"            , "W:k, k, k"                                , "RVM"     , "VEX.L1.0F.W1 4A /r"               , "ANY AVX512BW"],
@@ -4067,7 +4050,9 @@ $export[$as] = {
     ["vxorps"           , "W:ymm {kz}, ymm, ymm/m256/b32"            , "RVM-FV"  , "EVEX.NDS.256.0F.W0 57 /r"         , "ANY AVX512DQ-VL"],
     ["vxorps"           , "W:zmm {kz}, zmm, zmm/m512/b32"            , "RVM-FV"  , "EVEX.NDS.512.0F.W0 57 /r"         , "ANY AVX512DQ"]
   ]
-};
+}
+// ${JSON:END}
+;
 
 }).apply(this, typeof module === "object" && module && module.exports
   ? [module, "exports"] : [this.asmdb || (this.asmdb = {}), "x86data"]);

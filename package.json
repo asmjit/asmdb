@@ -4,11 +4,11 @@
   "license": "Unlicense",
   "engines": { "node": ">=4" },
 
-  "description": "X86/ARM instruction database and utilities.",
+  "description": "Instructions database and utilities for X86/X64 and ARM (THUMB/A32/A64) architectures.",
   "keywords": [
-    "asm", "assembler",
-    "arm", "thumb", "aarch32", "aarch64",
-    "x86", "x86_64", "x64"
+    "asm", "assembler", "database", "instructions",
+    "arm", "thumb", "thumb2", "a32", "a64", "aarch32", "aarch64",
+    "x86", "x86_64", "x64", "amd64"
   ],
 
   "homepage": "https://github.com/asmjit/asmdb",

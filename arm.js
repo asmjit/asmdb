@@ -21,160 +21,140 @@ function dict() { return Object.create(null); }
 // Can be used to assign the number of bits each part of the opcode occupies.
 // NOTE: THUMB instructions that uses halfword must always specify the width
 // of all registers as many instructictions accept only LO (r0..r7) registers.
-const PartBits = {
-  "P"   : 1,
-  "U"   : 1,
-  "W"   : 1,
-  "S"   : 1,
-  "R"   : 1,
-  "J1"  : 1,
-  "J2"  : 1,
-  "Type": 2,
-  "Cond": 4,
-  "Rd"  : 4,
-  "RdLo": 4,
-  "RdHi": 4,
-  "Rx"  : 4,
-  "Rn"  : 4,
-  "Rm"  : 4,
-  "Ra"  : 4,
-  "Rs"  : 4,
-  "Rt"  : 4,
-  "Rt2" : 4
+const FieldInfo = {
+  "P"     : { "bits": 1 },
+  "U"     : { "bits": 1 },
+  "W"     : { "bits": 1 },
+  "S"     : { "bits": 1 },
+  "R"     : { "bits": 1 },
+  "J1"    : { "bits": 1 },
+  "J2"    : { "bits": 1 },
+  "SOP"   : { "bits": 2 },
+  "Cond"  : { "bits": 4 },
+  "Cn"    : { "bits": 4 },
+  "Cm"    : { "bits": 4 },
+  "Rd"    : { "bits": 4, "read": false, "write": true  },
+  "Rd2"   : { "bits": 4, "read": false, "write": true  },
+  "RdLo"  : { "bits": 4, "read": false, "write": true  },
+  "RdHi"  : { "bits": 4, "read": false, "write": true  },
+  "RdList": { "bits": 4, "read": false, "write": true  , "list": true },
+  "Rx"    : { "bits": 4, "read": true , "write": true  },
+  "RxLo"  : { "bits": 4, "read": true , "write": true  },
+  "RxHi"  : { "bits": 4, "read": true , "write": true  },
+  "Rn"    : { "bits": 4, "read": true , "write": false },
+  "Rm"    : { "bits": 4, "read": true , "write": false },
+  "Ra"    : { "bits": 4, "read": true , "write": false },
+  "Rs"    : { "bits": 4, "read": true , "write": false },
+  "Rs2"   : { "bits": 4, "read": true , "write": false },
+  "RsList": { "bits": 4, "read": true , "write": false , "list": true }
 };
 
 // ARM utilities.
 class Utils {
-  // Matches the closing bracket, like `indexOf()`, but uses a counter and skips
-  // all nested brackets.
-  static matchClosingBracket(s, from) {
-    const opening = s.charCodeAt(from);
-    const closing = opening === 40  ? 31  :    // ().
-                    opening === 60  ? 62  :    // <>.
-                    opening === 91  ? 93  :    // [].
-                    opening === 123 ? 125 : 0; // {}.
-
-    const len = s.length;
-
-    var i = from;
-    var pending = 1;
-
-    do {
-      if (++i >= len)
-        break;
-
-      const c = s.charCodeAt(i);
-      pending += Number(c === opening);
-      pending -= Number(c === closing);
-    } while (pending);
-
-    return i;
-  }
-
-  static splitOperands(s) {
-    const result = [];
-
-    s = s.trim();
-    if (!s) return result;
-
-    var start = 0;
-    var i = 0;
-    var c = "";
-
-    for (;;) {
-      if (i === s.length || (c = s[i]) === ",") {
-        const op = s.substring(start, i).trim();
-        if (!op)
-          throw new Error(`asmdb.arm.Utils.splitOperands(): Found empty operand in '${s}'`);
-
-        result.push(op);
-        if (i === s.length)
-          return result;
-
-        start = ++i;
-        continue;
-      }
-
-      if (c === "[" || c === "{")
-        i = Utils.matchClosingBracket(s, i);
-      else
-        i++;
-    }
-  }
 }
 arm.Utils = Utils;
+
+function parseShiftOp(s) {
+  if (/^(SOP|LSL|LSR|ASR|ROR|RRX) /.test(s))
+    return s.substr(0, 3);
+  else
+    return "";
+}
+
+function normalizeNumber(n) {
+  return n < 0 ? 0x100000000 + n : n;
+}
+
+function decomposeOperand(s) {
+  var m = s.match(/==|!=|>=|<=|\*/);
+  var restrict = false;
+
+  if (m) {
+    restrict = s.substr(m.index);
+    s = s.substr(0, m.index);
+  }
+
+  return {
+    data    : s,
+    restrict: restrict
+  };
+}
 
 // ============================================================================
 // [asmdb.arm.Operand]
 // ============================================================================
 
 // ARM operand.
-class Operand {
-  constructor(data, defaultAccess) {
-    this.data = data;       // The operand's data (possibly processed).
-    this.type = "";         // Type of the operand.
+class Operand extends base.BaseOperand {
+  constructor(def) {
+    super(def);
 
-    this.read = false;      // True if the operand is a read-op (R or X) from reg/mem.
-    this.write = false;     // True if the operand is a write-op (W or X) to reg/mem.
-    this.sign = false;      // Operand (Immediate, Register, Memory) has a separate sign (+/-).
-    this.optional = false;  // Operand is {optional} (only immediates, zero in such case).
+    // --- ARM specific operand properties ---
+    this.shiftOp = "";         // Operand can specify shift operation.
+    this.sign = false;         // Operand (Immediate, Register, Memory) has a separate sign (+/-).
 
-    if (data.startsWith("{") && data.endsWith("}")) {
-      data = data.substring(1, data.length - 1);
-      this.data = data;
+    var s = def;
+    // Parse {}, which makes the operand optional.
+    if (s.startsWith("{") && s.endsWith("}")) {
       this.optional = true;
+      s = s.substring(1, s.length - 1);
     }
 
-    if (data.startsWith("[")) {
-      var mem = data;
+    // Parse shift operation.
+    var shiftOp = parseShiftOp(s);
+    if (shiftOp) {
+      this.shiftOp = shiftOp;
+      s = s.substring(shiftOp.length + 1);
+    }
+
+    if (s.startsWith("[")) {
+      var mem = s;
 
       if (mem.endsWith("{!}")) {
-        mem = mem.substr(0, mem.length - 3);
+        mem = mem.substring(0, mem.length - 3);
+        // TODO: MArk.
       }
       else if (mem.endsWith("!")) {
-        mem = mem.substr(0, mem.length - 1);
+        mem = mem.substring(0, mem.length - 1);
+        // TODO: MArk.
       }
 
       if (!mem.endsWith("]"))
-        throw new Error(`asmdb.arm.Operand(): Unknown memory operand '${data}'`);
+        throw new Error(`asmdb.arm.Operand(): Unknown memory operand '${mem}' in '${def}'`);
 
       // --- Setup memory operand ---
-      this.type = "mem";
-      this.mem = "";          // Memory operand's definition.
-      this.memType = "";      // Memory operand's type.
+      this.type     = "mem";
+      this.mem      = "";            // Memory operand's definition.
+      this.memType  = "";            // Memory operand's type.
     }
-    else if (data.startsWith("#")) {
-      var imm = data.substr(1);
-      var mul = imm.match(/\*\s*(\d+)$/);
-      var scale = 1;
-
-      if (mul) {
-        imm = data.substr(0, mul.index);
-        scale = parseInt(mul[1], 10);
-      }
+    else if (s.startsWith("#")) {
+      const obj = decomposeOperand(s);
+      const imm = obj.data;
 
       // --- Setup immediate operand ---
-      this.type = "imm";
-      this.imm = imm;         // Immediate operand name (also representing its type).
-      this.immSize = 0;       // Immediate size in bits.
-      this.immScale = scale;  // Immediate scale (image is multiplied by this constant by CPU before its used).
+      this.type     = "imm";
+      this.imm      = imm;           // Immediate operand name (also representing its type).
+      this.immSize  = 0;             // Immediate size in bits.
+      this.restrict = obj.restrict;  // Immediate condition.
     }
     else {
-      var reg = data;
-      var regType = reg.substr(0, 1).toLowerCase();
-      var regCond = "";
+      const obj = decomposeOperand(s);
+      const reg = obj.data;
 
-      var eq = reg.indexOf("==");
-      var ne = reg.indexOf("!=");
+      const type = reg.substr(0, 1).toLowerCase();
+      const info = FieldInfo[reg];
 
-      if (eq !== -1) { regCond = reg.substr(eq); reg = reg.substr(0, eq); }
-      if (ne !== -1) { regCond = reg.substr(ne); reg = reg.substr(0, ne); }
+      if (!info)
+        throw new Error(`asmdb.arm.Operand(): Unknown register operand '${reg}' in '${def}'`);
 
-      // --- Setup register operand ---
-      this.type = "reg";
-      this.reg = reg;         // Register name (as specified in manual).
-      this.regType = regType; // Register type.
-      this.regCond = regCond; // Register condition.
+      // --- Setup register or register-list operand ---
+      this.type     = info.list ? "reg-list" : "reg";
+      this.reg      = reg;           // Register name (as specified in manual).
+      this.regType  = type;          // Register type.
+      this.regList  = !!info.list;   // Register list.
+      this.read     = info.read;     // Register access (read).
+      this.write    = info.write;    // Register access (write).
+      this.restrict = obj.restrict;  // Register condition.
     }
   }
 
@@ -189,12 +169,12 @@ class Operand {
     }
   }
 
-  isReg() { return this.type === "reg"; }
-  isMem() { return this.type === "mem"; }
-  isImm() { return this.type === "imm"; }
-  isRel() { return this.type === "rel"; }
-
-  toString() { return this.data; }
+  get scale() {
+    if (this.restrict && this.restrict.startsWith("*"))
+      return parseInt(this.restrict.substr(1), 10);
+    else
+      return 0;
+  }
 }
 arm.Operand = Operand;
 
@@ -203,38 +183,35 @@ arm.Operand = Operand;
 // ============================================================================
 
 // ARM instruction.
-class Instruction {
-  constructor(name, operands, encoding, opcode, flags) {
-    // We use table encoding as arch as it's always one of T16/T32/A16/A64, which
-    // describes how the instruction is encoded and also the processor mode it
-    // requires to run. The encoding field will be expanded accordingly to the
-    // opcode value.
+class Instruction extends base.BaseInstruction {
+  constructor(name, operands, encoding, opcode, metadata) {
+    super();
+    this.assignData(name, operands, encoding, opcode, metadata);
+  }
 
-    this.name = name;         // Instruction name.
-    this.arch = encoding;     // Architecture - T16/T32/A32/A64.
-    this.encoding = "";       // Instruction encoding.
-
-    this.opcodeWord = 0;      // The whole opcode value (number) without all dynamic parts.
-    this.opcodeString = "";   // The whole opcode string, as specified in manual.
-
-    this.implicit = false;    // Uses implicit operands (registers / memory).
-    this.volatile = false;    // Volatile instruction hint for the instruction scheduler.
-
-    this.cpu = dict();        // CPU features required to execute the instruction.
-    this.operands = [];       // Instruction operands array.
+  assignData(name, operands, encoding, opcode, metadata) {
+    this.name = name;
 
     this.assignOperands(operands);
+    this.assignEncoding(encoding);
     this.assignOpcode(opcode);
+    this.assignMetadata(metadata);
+  }
+
+  assignEncoding(s) {
+    // Instruction encoding describes also the target architecture (THUMB|A32|A64):
+    this.arch = s === "T16" || s === "T32" ? "THUMB" : s;
+    this.encoding = s;
   }
 
   assignOperands(s) {
     if (!s) return;
 
     // Split into individual operands and push them to `operands`.
-    const parts = Utils.splitOperands(s);
-    for (var i = 0; i < parts.length; i++) {
-      const data = parts[i].trim();
-      const operand = new Operand(data);
+    const arr = base.Parsing.splitOperands(s);
+    for (var i = 0; i < arr.length; i++) {
+      const opstr = arr[i].trim();
+      const operand = new Operand(opstr);
 
       this.operands.push(operand);
     }
@@ -243,92 +220,96 @@ class Instruction {
   assignOpcode(s) {
     this.opcodeString = s;
 
-    var map = Object.create(null);
+    var opcodeIndex = 0;
+    var opcodeValue = 0;
 
-    var opcodeWord = 0;
-    var opcodeBits = 0;
+    // Split opcode into its fields.
+    const arr = s.split("|");
+    const fields = this.fields;
 
-    // Split opcode into its parts.
-    const parts = s.split("|");
-    for (var i = 0; i < parts.length; i++) {
-      var part = parts[i].trim();
+    for (var i = arr.length - 1; i >= 0; i--) {
+      var key = arr[i].trim();
       var m;
 
-      var bits = 0;
-      var mask = 0;
-      var size = 0;
-
-      if (/^[0-1]+$/.test(part)) {
-        // This part of the opcode are RAW bits.
-        size = part.length;
-        opcodeWord <<= size;
-        opcodeBits += size;
-        opcodeWord |= parseInt(part, 2);
+      if (/^[0-1]+$/.test(key)) {
+        // This part of the opcode are RAW bits, they contribute to the `opcodeValue`.
+        opcodeValue |= parseInt(key, 2) << opcodeIndex;
+        opcodeIndex += key.length;
       }
       else {
-        if ((m = part.match(/\[\s*(\d+)\s*\:\s*(\d+)\s*\]$/))) {
+        var bits = 0;
+        var mask = 0;
+        var size = 0;
+
+        if ((m = key.match(/\[\s*(\d+)\s*\:\s*(\d+)\s*\]$/))) {
           const a = parseInt(m[1], 10);
           const b = parseInt(m[2], 10);
           if (a < b)
-            throw new Error(`asmdb.arm.Instruction.assignOpcode(): Invalid bit range '${part}' in opcode '${s}'`);
-
+            throw new Error(`asmdb.arm.Instruction.assignOpcode(): Invalid bit range '${key}' in opcode '${s}'`);
           size = a - b + 1;
           mask = ((1 << size) - 1) << b;
-          part = part.substr(0, m.index).trim();
+          key = key.substr(0, m.index).trim();
         }
-        else if ((m = part.match(/\[\s*(\d+)\s*\]$/))) {
+        else if ((m = key.match(/\[\s*(\d+)\s*\]$/))) {
           const ab = parseInt(m[1], 10);
           size = 1;
           mask = 1 << ab;
-          part = part.substr(0, m.index).trim();
+          key = key.substr(0, m.index).trim();
         }
-        else if ((m = part.match(/\:\s*(\d+)$/))) {
+        else if ((m = key.match(/\:\s*(\d+)$/))) {
           size = parseInt(m[1], 10);
-          bits = bits;
-          part = part.substr(0, m.index).trim();
+          bits = size;
+          key = key.substr(0, m.index).trim();
         }
-        else if (PartBits[part]) {
+        else if (FieldInfo[key]) {
           // Sizes of some standard fields can be assigned automatically.
-          size = PartBits[part];
+          size = FieldInfo[key].bits;
           bits = size;
         }
         else {
-          throw new Error(`asmdb.arm.Instruction.assignOpcode(): Cannot recognize the size of part '${part}' of opcode '${s}'`);
+          throw new Error(`asmdb.arm.Instruction.assignOpcode(): Cannot recognize the size of '${key}' in opcode '${s}'`);
         }
 
-        const item = map[part] || (map[part] = { bits: 0, mask: 0 });
-        item.bits += bits;
-        item.mask |= mask;
+        const field = fields[key] || (fields[key] = {
+          index: opcodeIndex,
+          bits: 0,
+          mask: 0
+        });
 
-        opcodeWord <<= size;
-        opcodeBits += size;
+        field.bits += bits;
+        field.mask |= mask;
+        opcodeIndex += size;
       }
     }
 
-    // Fixup all parts.
-    for (var part in map) {
-      const item = map[part];
+    // Normalize all fields.
+    for (var key in fields) {
+      const field = fields[key];
 
       // There should be either number of bits or mask, there shouldn't be both.
-      if (item.bits) {
-        if (item.mask)
-          throw new Error(`asmdb.arm.Instruction.assignOpcode(): Part '${part}' of opcode '${s}' contains both, bits and mask`);
+      if (!field.bits && !field.mask)
+        throw new Error(`asmdb.arm.Instruction.assignOpcode(): Part '${key}' of opcode '${s}' contains neither size nor mask`);
 
-        item.mask = ((1 << item.bits) - 1) << item.bits;
-      }
-      else if (item.mask) {
-        item.bits = 32 - Math.clz32(item.mask);
-      }
+      if (field.bits && field.mask)
+        throw new Error(`asmdb.arm.Instruction.assignOpcode(): Part '${key}' of opcode '${s}' contains both size and mask`);
 
-      const op = this.getOperandByName(part);
-      if (op && op.isImm()) op.immSize = item.bits;
-      // if (!op) console.log(`CANNOT FIND ${part}`);
+      if (field.bits)
+        field.mask = ((1 << field.bits) - 1);
+      else if (field.mask)
+        field.bits = 32 - Math.clz32(field.mask);
+
+      const op = this.getOperandByName(key);
+      if (op && op.isImm()) op.immSize = field.bits;
     }
 
-    // Check if the opcode word has correct number of bits (either 16 or 32).
-    if (opcodeBits !== 16 && opcodeBits !== 32)
-      throw new Error(`asmdb.arm.Instruction.assignOpcode(): The number of opcode bits (${opcodeBits}) in '${s}' doesn't match 16 or 32`);
-    this.opcodeWord = opcodeWord;
+    // Check if the opcode value has the correct number of bits (either 16 or 32).
+    if (opcodeIndex !== 16 && opcodeIndex !== 32)
+      throw new Error(`asmdb.arm.Instruction.assignOpcode(): The number of bits '${opcodeIndex}' used by the opcode '${s}' doesn't match 16 or 32`);
+    this.opcodeValue = normalizeNumber(opcodeValue);
+  }
+
+  assignMetadata(metadata) {
+
   }
 
   getOperandByName(name) {
@@ -339,13 +320,6 @@ class Instruction {
         return op;
     }
     return null;
-  }
-
-  postValidate() {
-  }
-
-  toString() {
-    return `${this.name} ${this.operands.join(", ")}`;
   }
 }
 arm.Instruction = Instruction;
@@ -359,12 +333,8 @@ class DB extends base.BaseDB {
     super();
   }
 
-  createInstruction(name, operands, encoding, opcode, flags) {
-    return new Instruction(name, operands, encoding, opcode, flags);
-  }
-
-  updateStats(inst) {
-    return this;
+  createInstruction(name, operands, encoding, opcode, metadata) {
+    return new Instruction(name, operands, encoding, opcode, metadata);
   }
 
   addDefault() {
