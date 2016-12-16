@@ -46,7 +46,22 @@ const FieldInfo = {
   "Ra"    : { "bits": 4, "read": true , "write": false },
   "Rs"    : { "bits": 4, "read": true , "write": false },
   "Rs2"   : { "bits": 4, "read": true , "write": false },
-  "RsList": { "bits": 4, "read": true , "write": false , "list": true }
+  "RsList": { "bits": 4, "read": true , "write": false , "list": true },
+  "Dd"    : { "bits": 4, "read": false, "write": true  },
+  "Dx"    : { "bits": 4, "read": false, "write": true  },
+  "Dn"    : { "bits": 4, "read": false, "write": true  },
+  "Dm"    : { "bits": 4, "read": false, "write": true  },
+  "Sd"    : { "bits": 4, "read": false, "write": true  },
+  "Sx"    : { "bits": 4, "read": false, "write": true  },
+  "Sn"    : { "bits": 4, "read": false, "write": true  },
+  "Sm"    : { "bits": 4, "read": false, "write": true  },
+  "Vd"    : { "bits": 4, "read": false, "write": true  },
+  "VdList": { "bits": 4, "read": false, "write": true  , "list": true },
+  "Vx"    : { "bits": 4, "read": true , "write": true  },
+  "Vn"    : { "bits": 4, "read": false, "write": false },
+  "Vm"    : { "bits": 4, "read": false, "write": false },
+  "Vs"    : { "bits": 4, "read": true , "write": false },
+  "VsList": { "bits": 4, "read": true , "write": false , "list": true }
 };
 
 // ARM utilities.
@@ -78,6 +93,25 @@ function decomposeOperand(s) {
     data    : s,
     restrict: restrict
   };
+}
+
+function splitOpcodeFields(s, chars) {
+  const arr = s.split("|");
+
+  var i = 0;
+  while (i < arr.length) {
+    const val = arr[i];
+    if (/^[0-1A-Z]{2,}$/.test(val)) {
+      const subfields = val.match(/([0-1]+)|[A-Z]/g);
+      arr.splice(i, 1, subfields);
+      i += subfields.length;
+    }
+    else {
+      i++;
+    }
+  }
+
+  return arr;
 }
 
 // ============================================================================
@@ -224,7 +258,7 @@ class Instruction extends base.BaseInstruction {
     var opcodeValue = 0;
 
     // Split opcode into its fields.
-    const arr = s.split("|");
+    const arr = splitOpcodeFields(s);
     const fields = this.fields;
 
     for (var i = arr.length - 1; i >= 0; i--) {
@@ -232,14 +266,20 @@ class Instruction extends base.BaseInstruction {
       var m;
 
       if (/^[0-1]+$/.test(key)) {
-        // This part of the opcode are RAW bits, they contribute to the `opcodeValue`.
+        // This part of the opcode is RAW bits, they contribute to the `opcodeValue`.
         opcodeValue |= parseInt(key, 2) << opcodeIndex;
         opcodeIndex += key.length;
       }
       else {
-        var bits = 0;
-        var mask = 0;
         var size = 0;
+        var mask = 0;
+        var bits = 0;
+
+        const lbit = key.startsWith("'");
+        const hbit = key.endsWith("'");
+
+        if (lbit) key = key.substring(1);
+        if (hbit) key = key.substring(0, key.length - 1);
 
         if ((m = key.match(/\[\s*(\d+)\s*\:\s*(\d+)\s*\]$/))) {
           const a = parseInt(m[1], 10);
@@ -273,11 +313,15 @@ class Instruction extends base.BaseInstruction {
         const field = fields[key] || (fields[key] = {
           index: opcodeIndex,
           bits: 0,
-          mask: 0
+          mask: 0,
+          hbit: 0 // Only 1 if a single quote (') was used.
         });
 
-        field.bits += bits;
         field.mask |= mask;
+        field.bits += bits;
+        field.lbit += lbit;
+        field.hbit += hbit;
+
         opcodeIndex += size;
       }
     }
@@ -297,6 +341,17 @@ class Instruction extends base.BaseInstruction {
         field.mask = ((1 << field.bits) - 1);
       else if (field.mask)
         field.bits = 32 - Math.clz32(field.mask);
+
+      // Handle field that used single-quote.
+      if (field.lbit) {
+        field.mask = (field.mask << 1) | 0x1;
+        field.bits++;
+      }
+
+      if (field.hbit) {
+        field.mask |= 1 << field.bits;
+        field.bits++;
+      }
 
       const op = this.getOperandByName(key);
       if (op && op.isImm()) op.immSize = field.bits;
