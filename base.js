@@ -141,13 +141,6 @@ class BaseInstruction {
     this.operands = [];        // Instruction operands.
   }
 
-  // Called by the database to assign data to the instruction.
-  //
-  // This function must be provided by an architecture dependent implementation.
-  assignData(name, operands, encoding, opcode, metadata) {
-    throw new Error(`asmdb.base.BaseInstruction.assignData() is abstract`);
-  }
-
   toString() {
     return `${this.name} ${this.operands.join(", ")}`;
   }
@@ -174,11 +167,11 @@ class BaseDB {
   }
 
   createInstruction(name, operands, encoding, opcode, metadata) {
-    throw new ("asmdb.base.BaseDB.createInstruction(): Must be reimplemented.");
+    throw new ("asmdb.base.BaseDB.createInstruction(): Must be reimplemented");
   }
 
   addDefault() {
-    throw new ("asmdb.base.BaseDB.addDefault(): Must be reimplemented.");
+    throw new ("asmdb.base.BaseDB.addDefault(): Must be reimplemented");
   }
 
   addInstructions(instructions) {

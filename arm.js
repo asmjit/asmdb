@@ -27,10 +27,13 @@ const FieldInfo = {
   "W"     : { "bits": 1 },
   "S"     : { "bits": 1 },
   "R"     : { "bits": 1 },
-  "J1"    : { "bits": 1 },
-  "J2"    : { "bits": 1 },
-  "SOP"   : { "bits": 2 },
+  "Ja"    : { "bits": 1 },
+  "Jb"    : { "bits": 1 },
+  "Op"    : { "bits": 1 }, // TODO: This should be fixed.
+  "Sz"    : { "bits": 2 },
+  "Sop"   : { "bits": 2 },
   "Cond"  : { "bits": 4 },
+  "CMode" : { "bits": 4 },
   "Cn"    : { "bits": 4 },
   "Cm"    : { "bits": 4 },
   "Rd"    : { "bits": 4, "read": false, "write": true  },
@@ -49,32 +52,95 @@ const FieldInfo = {
   "RsList": { "bits": 4, "read": true , "write": false , "list": true },
   "Dd"    : { "bits": 4, "read": false, "write": true  },
   "Dx"    : { "bits": 4, "read": false, "write": true  },
+  "Dx2"   : { "bits": 4, "read": false, "write": true  },
   "Dn"    : { "bits": 4, "read": false, "write": true  },
+  "Dn2"   : { "bits": 4, "read": false, "write": true  },
+  "Dn3"   : { "bits": 4, "read": false, "write": true  },
+  "Dn4"   : { "bits": 4, "read": false, "write": true  },
   "Dm"    : { "bits": 4, "read": false, "write": true  },
+  "Ds"    : { "bits": 4, "read": false, "write": true  },
   "Sd"    : { "bits": 4, "read": false, "write": true  },
+  "Sd2"   : { "bits": 4, "read": false, "write": true  },
   "Sx"    : { "bits": 4, "read": false, "write": true  },
   "Sn"    : { "bits": 4, "read": false, "write": true  },
   "Sm"    : { "bits": 4, "read": false, "write": true  },
+  "Ss"    : { "bits": 4, "read": false, "write": true  },
+  "Ss2"   : { "bits": 4, "read": false, "write": true  },
   "Vd"    : { "bits": 4, "read": false, "write": true  },
+  "Vd2"   : { "bits": 4, "read": false, "write": true  },
   "VdList": { "bits": 4, "read": false, "write": true  , "list": true },
   "Vx"    : { "bits": 4, "read": true , "write": true  },
+  "Vx2"   : { "bits": 4, "read": true , "write": true  },
   "Vn"    : { "bits": 4, "read": false, "write": false },
   "Vm"    : { "bits": 4, "read": false, "write": false },
   "Vs"    : { "bits": 4, "read": true , "write": false },
+  "Vs2"   : { "bits": 4, "read": true , "write": false },
   "VsList": { "bits": 4, "read": true , "write": false , "list": true }
 };
 
 // ARM utilities.
 class Utils {
+  static parseShiftOp(s) {
+    if (/^(Sop|LSL|LSR|ASR|ROR|RRX) /.test(s))
+      return s.substr(0, 3);
+    else
+      return "";
+  }
+
+  static parseDtArray(s) {
+    const out = [];
+    if (!s) return out;
+
+    const arr = s.split("|");
+    var i;
+
+    // First expand anything between X-Y, for example s8-32 would be expanded to [s8, s16, s32].
+    for (i = 0; i < arr.length; i++) {
+      const v = arr[i];
+
+      if (v.indexOf("-") !== -1) {
+        const m = /^([A-Za-z]+)(\d+)-(\d+)$/.exec("r16-32");
+        if (!m)
+          throw new Error(`asmdb.arm.Utils.parseDtArray(): Couldn't parse '${s}' data-type`);
+
+        var type = m[1];
+        var size = parseInt(m[2], 10);
+        var last = parseInt(m[3], 10);
+
+        if (!Utils.checkDtSize(size) || !Utils.checkDtSize(last))
+          throw new Error(`asmdb.arm.Utils.parseDtArray(): Invalid dt width in '${s}'`);
+
+        do {
+          out.push(type + String(size));
+          size <<= 1;
+        } while (size <= last);
+      }
+      else {
+        out.push(v);
+      }
+    }
+
+    // Now expand 'x' to 's' and 'u'.
+    i = 0;
+    while (i < out.length) {
+      const v = out[i];
+      if (v.startsWith("x")) {
+        out.splice(i, 1, "s" + v.substr(1), "u" + v.substr(1));
+        i += 2;
+      }
+      else {
+        i++;
+      }
+    }
+
+    return out;
+  }
+
+  static checkDtSize(x) {
+    return x === 8 || x === 16 || x === 32 || x === 64;
+  }
 }
 arm.Utils = Utils;
-
-function parseShiftOp(s) {
-  if (/^(SOP|LSL|LSR|ASR|ROR|RRX) /.test(s))
-    return s.substr(0, 3);
-  else
-    return "";
-}
 
 function normalizeNumber(n) {
   return n < 0 ? 0x100000000 + n : n;
@@ -95,23 +161,19 @@ function decomposeOperand(s) {
   };
 }
 
-function splitOpcodeFields(s, chars) {
+function splitOpcodeFields(s) {
   const arr = s.split("|");
+  const out = [];
 
-  var i = 0;
-  while (i < arr.length) {
+  for (var i = 0; i < arr.length; i++) {
     const val = arr[i];
-    if (/^[0-1A-Z]{2,}$/.test(val)) {
-      const subfields = val.match(/([0-1]+)|[A-Z]/g);
-      arr.splice(i, 1, subfields);
-      i += subfields.length;
-    }
-    else {
-      i++;
-    }
+    if (/^[0-1A-Z]{2,}$/.test(val))
+      out.push.apply(out, val.match(/([0-1]+)|[A-Z]/g));
+    else
+      out.push(val);
   }
 
-  return arr;
+  return out;
 }
 
 // ============================================================================
@@ -135,7 +197,7 @@ class Operand extends base.BaseOperand {
     }
 
     // Parse shift operation.
-    var shiftOp = parseShiftOp(s);
+    var shiftOp = Utils.parseShiftOp(s);
     if (shiftOp) {
       this.shiftOp = shiftOp;
       s = s.substring(shiftOp.length + 1);
@@ -220,25 +282,30 @@ arm.Operand = Operand;
 class Instruction extends base.BaseInstruction {
   constructor(name, operands, encoding, opcode, metadata) {
     super();
-    this.assignData(name, operands, encoding, opcode, metadata);
-  }
 
-  assignData(name, operands, encoding, opcode, metadata) {
     this.name = name;
+    this.s = null;                   // Instruction S flag (null, true, or false).
+    this.dt = [];                    // Instruction <dt> field (first data-type).
+    this.dt2 = [];                   // Instruction <dt2> field (second data-type).
 
-    this.assignOperands(operands);
-    this.assignEncoding(encoding);
-    this.assignOpcode(opcode);
-    this.assignMetadata(metadata);
+    this._assignOperands(operands);
+    this._assignEncoding(encoding);
+    this._assignOpcode(opcode);
+    this._assignMetadata(metadata);
+    this._postProcess();
   }
 
-  assignEncoding(s) {
-    // Instruction encoding describes also the target architecture (THUMB|A32|A64):
+  // ARM encoding specifies whether the instruction is:
+  //   - T16 (16-bit THUMB)
+  //   - T32 (32-bit THUMB2)
+  //   - A32 (AArch32 / ARM)
+  //   - A64 (AArch64)
+  _assignEncoding(s) {
     this.arch = s === "T16" || s === "T32" ? "THUMB" : s;
     this.encoding = s;
   }
 
-  assignOperands(s) {
+  _assignOperands(s) {
     if (!s) return;
 
     // Split into individual operands and push them to `operands`.
@@ -251,7 +318,7 @@ class Instruction extends base.BaseInstruction {
     }
   }
 
-  assignOpcode(s) {
+  _assignOpcode(s) {
     this.opcodeString = s;
 
     var opcodeIndex = 0;
@@ -259,6 +326,8 @@ class Instruction extends base.BaseInstruction {
 
     // Split opcode into its fields.
     const arr = splitOpcodeFields(s);
+    const dup = dict();
+
     const fields = this.fields;
 
     for (var i = arr.length - 1; i >= 0; i--) {
@@ -275,11 +344,8 @@ class Instruction extends base.BaseInstruction {
         var mask = 0;
         var bits = 0;
 
-        const lbit = key.startsWith("'");
-        const hbit = key.endsWith("'");
-
-        if (lbit) key = key.substring(1);
-        if (hbit) key = key.substring(0, key.length - 1);
+        var lbit = key.startsWith("'");
+        var hbit = key.endsWith("'");
 
         if ((m = key.match(/\[\s*(\d+)\s*\:\s*(\d+)\s*\]$/))) {
           const a = parseInt(m[1], 10);
@@ -301,13 +367,40 @@ class Instruction extends base.BaseInstruction {
           bits = size;
           key = key.substr(0, m.index).trim();
         }
-        else if (FieldInfo[key]) {
-          // Sizes of some standard fields can be assigned automatically.
-          size = FieldInfo[key].bits;
-          bits = size;
-        }
         else {
-          throw new Error(`asmdb.arm.Instruction.assignOpcode(): Cannot recognize the size of '${key}' in opcode '${s}'`);
+          const key_ = key;
+
+          if (lbit || hbit) {
+            if (lbit && hbit)
+              throw new Error(`asmdb.arm.Instruction.assignOpcode(): Couldn't recognize the format of '${key}' in opcode '${s}'`);
+
+            if (lbit) key = key.substring(1);
+            if (hbit) key = key.substring(0, key.length - 1);
+
+            size = 1;
+          }
+          else if (FieldInfo[key]) {
+            // Sizes of some standard fields can be assigned automatically.
+            size = FieldInfo[key].bits;
+            bits = size;
+          }
+          else if (key.length === 1) {
+            // Sizes of one-letter fields (like 'U', 'F', etc...) is 1 if not specified.
+            size = 1;
+            bits = 1;
+          }
+          else {
+            throw new Error(`asmdb.arm.Instruction.assignOpcode(): Couldn't recognize the size of '${key}' in opcode '${s}'`);
+          }
+
+          if (dup[key_] === true) {
+            bits = 0;
+            lbit = 0;
+            hbit = 0;
+          }
+          else {
+            dup[key_] = true;
+          }
         }
 
         const field = fields[key] || (fields[key] = {
@@ -363,8 +456,42 @@ class Instruction extends base.BaseInstruction {
     this.opcodeValue = normalizeNumber(opcodeValue);
   }
 
-  assignMetadata(metadata) {
+  _assignMetadata(s) {
 
+  }
+
+  // ARM instruction name could consist of name and optional type information
+  // specified as <dt> and <dt2> in ARM manuals. We parse this information and
+  // store it to `dt` and `dt2` fields. In addition, we also recognize the `S`
+  // suffix (uppercase) of the instruction and mark it as `S` instruction. After
+  // that the name is normalized to be lowercased.
+  //
+  // This functionality requires all the instruction data to be already set-up.
+  _postProcess() {
+    var s = this.name;
+
+    // Parse <dt> and <dt2> fields.
+    if (s.indexOf(".") !== -1) {
+      const parts = s.split(".");
+      this.name = parts[0];
+
+      if (parts.length > 3)
+        throw new Error(`asmdb.arm.Instruction.assignName(): Couldn't recognize name attributes of '${s}'`);
+
+      for (var i = 1; i < parts.length; i++) {
+        const dt = Utils.parseDtArray(parts[i]);
+        if (i === 1)
+          this.dt = dt;
+        else
+          this.dt2 = dt;
+      }
+    }
+
+    // Recognize "S" suffix.
+    if (this.name.endsWith("S")) {
+      this.name = this.name.substr(0, this.name.length - 1) + "s";
+      this.s = true;
+    }
   }
 
   getOperandByName(name) {

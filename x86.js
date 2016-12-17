@@ -37,7 +37,7 @@ function buildCpuRegs(defs) {
 
     for (var i = 0; i < names.length; i++) {
       var name = names[i];
-      var m = /^([\w\(\)]+)(\d+)-(\d+)([\w\(\)]*)$/.exec(name);
+      var m = /^([A-Za-z\(\)]+)(\d+)-(\d+)([A-Za-z\(\)]*)$/.exec(name);
 
       if (m) {
         var a = parseInt(m[2], 10);
@@ -151,23 +151,23 @@ class Operand extends base.BaseOperand {
   constructor(def, defaultAccess) {
     super(def);
 
-    this.reg = "";          // Register operand's definition.
-    this.regType = "";      // Register operand's type.
+    this.reg = "";             // Register operand's definition.
+    this.regType = "";         // Register operand's type.
 
-    this.mem = "";          // Memory operand's definition.
-    this.memSize = -1;      // Memory operand's size.
-    this.memOff = false;    // Memory operand is an absolute offset (only a specific version of MOV).
-    this.memSeg = "";       // Segment specified with register that is used to perform a memory IO.
-    this.vsibReg = "";      // AVX VSIB register type (xmm/ymm/zmm).
-    this.vsibSize = -1;     // AVX VSIB register size (32/64).
-    this.bcstSize = -1;     // AVX-512 broadcast size.
+    this.mem = "";             // Memory operand's definition.
+    this.memSize = -1;         // Memory operand's size.
+    this.memOff = false;       // Memory operand is an absolute offset (only a specific version of MOV).
+    this.memSeg = "";          // Segment specified with register that is used to perform a memory IO.
+    this.vsibReg = "";         // AVX VSIB register type (xmm/ymm/zmm).
+    this.vsibSize = -1;        // AVX VSIB register size (32/64).
+    this.bcstSize = -1;        // AVX-512 broadcast size.
 
-    this.imm = 0;           // Immediate operand's size.
-    this.immValue = null;   // Immediate value - `null` or `1` (only used by shift/rotate instructions).
-    this.rel = 0;           // Relative displacement operand's size.
+    this.imm = 0;              // Immediate operand's size.
+    this.immValue = null;      // Immediate value - `null` or `1` (only used by shift/rotate instructions).
+    this.rel = 0;              // Relative displacement operand's size.
 
-    this.rwxIndex = -1;     // Read/Write (RWX) index.
-    this.rwxWidth = -1;     // Read/Write (RWX) width.
+    this.rwxIndex = -1;        // Read/Write (RWX) index.
+    this.rwxWidth = -1;        // Read/Write (RWX) width.
 
     const type = [];
 
@@ -313,65 +313,59 @@ x86.Operand = Operand;
 class Instruction extends base.BaseInstruction {
   constructor(name, operands, encoding, opcode, metadata) {
     super();
-    this.assignData(name, operands, encoding, opcode, metadata);
+
+    this.name = name;
+    this.prefix = "";          // Prefix - "", "3DNOW", "EVEX", "VEX", "XOP".
+    this.opcodeHex = "";       // A single opcode byte as hexadecimal string "00-FF".
+
+    this.l = "";               // Opcode L field (nothing, 128, 256, 512).
+    this.w = "";               // Opcode W field.
+    this.pp = "";              // Opcode PP part.
+    this.mm = "";              // Opcode MM[MMM] part.
+    this.vvvv = "";            // Opcode VVVV part.
+    this._67h = false;         // Instruction requires a size override prefix.
+
+    this.rm = "";              // Instruction specific payload "/0..7".
+    this.rmInt = -1;           // Instruction specific payload as integer (0-7).
+    this.ri = false;           // Instruction opcode is combined with register, "XX+r" or "XX+i".
+    this.rel = 0;              // Displacement (cb cw cd parts).
+
+    this.lock = false;         // Can be used with LOCK prefix.
+    this.rep = false;          // Can be used with REP prefix.
+    this.repz = false;         // Can be used with REPE/REPZ prefix.
+    this.repnz = false;        // Can be used with REPNE/REPNZ prefix.
+    this.xcr = "";             // Reads or writes to/from XCR register.
+
+    this.privilege = 3;        // Privilege level required to execute the instruction.
+
+    this.fpuTop = 0;           // FPU top index manipulation [-1, 0, 1, 2].
+    this.fpu = false;          // If the instruction is an FPU instruction.
+    this.mmx = false;          // If the instruction is an MMX instruction.
+
+    this.vsibReg = "";         // AVX VSIB register type (xmm/ymm/zmm).
+    this.vsibSize = -1;        // AVX VSIB register size (32/64).
+
+    this.broadcast = false;    // AVX-512 broadcast support.
+    this.bcstSize = -1;        // AVX-512 broadcast size.
+
+    this.kmask = false;        // AVX-512 merging {k}.
+    this.zmask = false;        // AVX-512 zeroing {kz}, implies {k}.
+    this.sae = false;          // AVX-512 suppress all exceptions {sae} support.
+    this.rnd = false;          // AVX-512 embedded rounding {er}, implies {sae}.
+
+    this.tupleType = "";       // AVX-512 tuple-type.
+    this.elementSize = -1;     // Instruction's element size.
+    this.invalid = 0;          // Number of problems detected by asmdb.x86.DB.
+    this.eflags = dict();      // CPU flags read/written/zeroed/set/undefined.
+
+    this._assignOperands(operands);
+    this._assignEncoding(encoding);
+    this._assignOpcode(opcode);
+    this._assignMetadata(metadata);
+    this._postProcess();
   }
 
-  assignData(name, operands, encoding, opcode, metadata) {
-    this.name = name;         // Instruction name.
-    this.prefix = "";         // Prefix - "", "3DNOW", "EVEX", "VEX", "XOP".
-
-    this.opcodeHex = "";      // A single opcode byte as hexadecimal string "00-FF".
-
-    this.l = "";              // Opcode L field (nothing, 128, 256, 512).
-    this.w = "";              // Opcode W field.
-    this.pp = "";             // Opcode PP part.
-    this.mm = "";             // Opcode MM[MMM] part.
-    this.vvvv = "";           // Opcode VVVV part.
-    this._67h = false;        // Instruction requires a size override prefix.
-
-    this.rm = "";             // Instruction specific payload "/0..7".
-    this.rmInt = -1;          // Instruction specific payload as integer (0-7).
-    this.ri = false;          // Instruction opcode is combined with register, "XX+r" or "XX+i".
-    this.rel = 0;             // Displacement (cb cw cd parts).
-
-    this.lock = false;        // Can be used with LOCK prefix.
-    this.rep = false;         // Can be used with REP prefix.
-    this.repz = false;        // Can be used with REPE/REPZ prefix.
-    this.repnz = false;       // Can be used with REPNE/REPNZ prefix.
-    this.xcr = "";            // Reads or writes to/from XCR register.
-
-    this.privilege = 3;       // Privilege level required to execute the instruction.
-
-    this.fpuTop = 0;          // FPU top index manipulation [-1, 0, 1, 2].
-    this.fpu = false;         // If the instruction is an FPU instruction.
-    this.mmx = false;         // If the instruction is an MMX instruction.
-
-    this.vsibReg = "";        // AVX VSIB register type (xmm/ymm/zmm).
-    this.vsibSize = -1;       // AVX VSIB register size (32/64).
-
-    this.broadcast = false;   // AVX-512 broadcast support.
-    this.bcstSize = -1;       // AVX-512 broadcast size.
-
-    this.kmask = false;       // AVX-512 merging {k}.
-    this.zmask = false;       // AVX-512 zeroing {kz}, implies {k}.
-    this.sae = false;         // AVX-512 suppress all exceptions {sae} support.
-    this.rnd = false;         // AVX-512 embedded rounding {er}, implies {sae}.
-
-    this.tupleType = "";      // AVX-512 tuple-type.
-    this.elementSize = -1;    // Instruction's element size.
-    this.invalid = 0;         // Number of problems detected by asmdb.x86.DB.
-    this.cpu = dict();        // CPU features required to execute the instruction.
-    this.eflags = dict();     // CPU flags read/written/zeroed/set/undefined.
-    this.operands = [];       // Instruction operands array.
-
-    this.assignOperands(operands);
-    this.assignEncoding(encoding);
-    this.assignOpcode(opcode);
-    this.assignMetadata(metadata);
-    this.postValidate();
-  }
-
-  assignOperands(s) {
+  _assignOperands(s) {
     if (!s) return;
 
     // First remove all flags specified as {...}. We put them into `flags`
@@ -384,7 +378,7 @@ class Instruction extends base.BaseInstruction {
         break;
 
       // Get the `flag` and remove from `s`.
-      this.assignFlag(s.substring(a + 1, b), true);
+      this._assignFlag(s.substring(a + 1, b), true);
       s = s.substr(0, a) + s.substr(b + 1);
     }
 
@@ -396,7 +390,7 @@ class Instruction extends base.BaseInstruction {
 
       // Propagate broadcast.
       if (operand.bcstSize > 0)
-        this.assignFlag("broadcast", operand.bcstSize);
+        this._assignFlag("broadcast", operand.bcstSize);
 
       // Propagate implicit operand.
       if (operand.implicit)
@@ -416,7 +410,7 @@ class Instruction extends base.BaseInstruction {
     }
   }
 
-  assignEncoding(s) {
+  _assignEncoding(s) {
     // Parse 'TUPLE-TYPE' as defined by AVX-512.
     var i = s.indexOf("-");
     if (i !== -1) {
@@ -427,7 +421,7 @@ class Instruction extends base.BaseInstruction {
     this.encoding = s;
   }
 
-  assignOpcode(s) {
+  _assignOpcode(s) {
     this.opcodeString = s;
 
     var parts = s.split(" ");
@@ -603,7 +597,7 @@ class Instruction extends base.BaseInstruction {
       this.report(`Couldn't parse instruction's opcode '${this.opcodeString}'`);
   }
 
-  assignMetadata(s) {
+  _assignMetadata(s) {
     // Parse individual flags separated by spaces.
     var flags = s.split(" ");
 
@@ -613,13 +607,13 @@ class Instruction extends base.BaseInstruction {
 
       var j = flag.indexOf("=");
       if (j !== -1)
-        this.assignFlag(flag.substr(0, j), flag.substr(j + 1));
+        this._assignFlag(flag.substr(0, j), flag.substr(j + 1));
       else
-        this.assignFlag(flag, true);
+        this._assignFlag(flag, true);
     }
   }
 
-  assignFlag(name, value) {
+  _assignFlag(name, value) {
     // Basics.
     if (kCpuArchitecture[name] === true) { this.arch         = name ; return; }
     if (kCpuFeatures[name]     === true) { this.cpu[name]    = true ; return; }
@@ -676,7 +670,7 @@ class Instruction extends base.BaseInstruction {
   // Validate the instruction's definition. Common mistakes can be checked and
   // reported easily, however, if the mistake is just an invalid opcode or
   // something else it's impossible to detect.
-  postValidate() {
+  _postProcess() {
     var isValid = true;
     var immCount = this.getImmCount();
 
@@ -713,8 +707,6 @@ class Instruction extends base.BaseInstruction {
     // Verify that if the instruction uses the "VVVV" part of VEX/EVEX prefix,
     // that it has "NDS/NDD/DDS" part of the "VVVV" definition specified, and
     // that the definition matches the opcode encoding.
-
-    return isValid;
   }
 
   isAVX() { return this.isVEX() || this.isEVEX(); }
