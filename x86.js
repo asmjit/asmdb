@@ -623,7 +623,7 @@ class Instruction extends base.BaseInstruction {
     if (/^AVX512\w+-VL$/.test(name) && kCpuFeatures[name.substr(0, name.length - 3)] === true) {
       var cpuFlag = name.substr(0, name.length - 3);
       this.cpu[cpuFlag] = true;
-      this.cpu.AVX512VL = true;
+      this.cpu.AVX512_VL = true;
       return;
     }
 
