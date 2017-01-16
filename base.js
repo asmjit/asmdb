@@ -10,15 +10,21 @@
 const base = $export[$as] = {};
 const hasOwn = Object.prototype.hasOwnProperty;
 
+// Creates an Object without a prototype (used as a map).
+function dict() { return Object.create(null); }
+
+// If something failed...
+function fail(msg) { throw new Error("[BASE] " + msg); }
+
+// Replaces default arguments object (if not provided).
+const NoObject = Object.freeze({});
+
 // Indexes used by instruction-data.
 const kIndexName     = 0;
 const kIndexOperands = 1;
 const kIndexEncoding = 2;
 const kIndexOpcode   = 3;
 const kIndexMetadata = 4;
-
-// Creates an Object without a prototype (used as a map).
-function dict() { return Object.create(null); }
 
 // ============================================================================
 // [asmdb.base.Parsing]
@@ -72,7 +78,7 @@ class Parsing {
       if (i === s.length || (c = s[i]) === ",") {
         const op = s.substring(start, i).trim();
         if (!op)
-          throw new Error(`asmdb.arm.Utils.splitOperands(): Found empty operand in '${s}'`);
+          fail(`Found empty operand in '${s}'`);
 
         result.push(op);
         if (i === s.length)
@@ -125,20 +131,118 @@ base.BaseOperand = BaseOperand;
 // Defines interface and properties that each architecture dependent instruction
 // must provide even if that particular architecture doesn't use that feature(s).
 class BaseInstruction {
-  constructor() {
+  constructor(db) {
+    Object.defineProperty(this, "db", { value: db });
+
     this.name = "";            // Instruction name.
     this.arch = "ANY";         // Architecture.
     this.encoding = "";        // Encoding type.
 
     this.implicit = false;     // Uses implicit operands (registers / memory).
-    this.volatile = false;     // Has side effects and can be considered volatile.
 
     this.opcodeString = "";    // Instruction opcode as specified in manual.
     this.opcodeValue = 0;      // Instruction opcode as number (arch dependent).
     this.fields = dict();      // Information about each opcode field (arch dependent).
+    this.extensions = dict();  // Extensions required by the instruction.
+    this.attributes = dict();  // Instruction attributes from metadata & opcode.
+    this.specialRegs = dict(); // Information about read/write to special registers.
 
-    this.cpu = dict();         // CPU features required to execute the instruction.
     this.operands = [];        // Instruction operands.
+  }
+
+  _assignMetadata(s) {
+    // Split into individual attributes (separated by spaces).
+    const attributes = s.trim().split(/[ ]+/);
+    const shortcuts = this.db.shortcuts;
+
+    for (var i = 0; i < attributes.length; i++) {
+      const attr = attributes[i].trim();
+      if (!attr) continue;
+
+      const eq = attr.indexOf("=");
+      var key = eq === -1 ? attr   : attr.substr(0, eq);
+      var val = eq === -1 ? "TRUE" : attr.substr(eq + 1);
+
+      // apply shortcut, if defined.
+      const shortcut = shortcuts[key];
+      if (shortcut)
+        key = shortcut.expand;
+
+      // If the key contains "|" it's a definition of multiple attributes.
+      if (key.indexOf("|") !== -1) {
+        const dot = key.indexOf(".");
+
+        const base = dot === -1 ? "" : key.substr(0, dot + 1);
+        const keys = (dot === -1 ? key : key.substr(dot + 1)).split("|");
+
+        for (var i = 0; i < keys.length; i++)
+          this._assignAttribute(base + keys[i], val);
+        return;
+      }
+
+      this._assignAttribute(key, val);
+    }
+  }
+
+  _assignAttribute(key, value) {
+    if (this._assignSimpleAttribute(key, value))
+      return;
+
+    if (this._assignSpecificAttribute(key, value))
+      return;
+
+    this.report(`Unhandled flag ${key}=${value}`);
+  }
+
+  _assignSimpleAttribute(key, value) {
+    const db = this.db;
+
+    const extensionDef = db.extensions[key];
+    if (extensionDef) {
+      this.extensions[key] = true;
+      return true;
+    }
+
+    const attributeDef = db.attributes[key];
+    if (attributeDef) {
+      switch (attributeDef.type) {
+        case "flag":
+          value = String(value).toUpperCase() === "TRUE" ? true : false;
+          break;
+
+        case "string":
+          value = String(value);
+          break;
+
+        case "string[]":
+          value = String(value).split("|");
+          break;
+
+        default:
+          fail(`Unknown attribute type ${attributeDef.type}`);
+      }
+
+      this.attributes[key] = value;
+      return true;
+    }
+
+    if (db.specialRegs[key]) {
+      if (typeof value !== "string" || !/^[RWXU01]$/.test(value))
+        this.report(`Special registers must contain 'R|W|X|U|0|1', not ${value}`);
+
+      this.specialRegs[key] = value;
+      return true;
+    }
+
+    return false;
+  }
+
+  _assignSpecificAttribute(key, value) {
+    return false;
+  }
+
+  report(msg) {
+    console.log(`${this}: ${msg}`);
   }
 
   toString() {
@@ -153,6 +257,12 @@ base.BaseInstruction = BaseInstruction;
 
 class BaseDB {
   constructor() {
+    this._cpuLevels = dict();
+    this._extensions = dict();
+    this._attributes = dict();
+    this._specialRegs = dict();
+    this._shortcuts = dict();
+
     // Maps an instruction name to an array of all Instruction instances.
     this.map = Object.create(null);
 
@@ -166,22 +276,129 @@ class BaseDB {
     };
   }
 
-  createInstruction(name, operands, encoding, opcode, metadata) {
-    throw new ("asmdb.base.BaseDB.createInstruction(): Must be reimplemented");
+  get cpuLevels() { return this._cpuLevels; }
+  get extensions() { return this._extensions; }
+  get attributes() { return this._attributes; }
+  get specialRegs() { return this._specialRegs; }
+  get shortcuts() { return this._shortcuts; }
+
+  _createInstruction(name, operands, encoding, opcode, metadata) {
+    fail("Abstract method called");
   }
 
   addDefault() {
-    throw new ("asmdb.base.BaseDB.addDefault(): Must be reimplemented");
+    fail("DB.addDefault() - Instructions are added by default, use new DB({ builtins: false }) to turn this feature off");
   }
 
-  addInstructions(instructions) {
+  addData(data) {
+    if (typeof data !== "object" || !data)
+      fail("Data must be object");
+
+    if (data.cpuLevels) this._addCpuLevels(data.cpuLevels);
+    if (data.extensions) this._addExtensions(data.extensions);
+    if (data.attributes) this._addAttributes(data.attributes);
+    if (data.specialRegs) this._addSpecialRegs(data.specialRegs);
+    if (data.shortcuts) this._addShortcuts(data.shortcuts);
+    if (data.instructions) this._addInstructions(data.instructions);
+  }
+
+  _addCpuLevels(items) {
+    if (!Array.isArray(items))
+      fail("Property 'cpuLevels' must be array");
+
+    for (var i = 0; i < items.length; i++) {
+      const item = items[i];
+      const name = item.name;
+
+      const obj = {
+        name: name
+      };
+
+      this._cpuLevels[name] = obj;
+    }
+  }
+
+  _addExtensions(items) {
+    if (!Array.isArray(items))
+      fail("Property 'extensions' must be array");
+
+    for (var i = 0; i < items.length; i++) {
+      const item = items[i];
+      const name = item.name;
+
+      const obj = {
+        name: name,
+        from: item.from || ""
+      };
+
+      this._extensions[name] = obj;
+    }
+  }
+
+  _addAttributes(items) {
+    if (!Array.isArray(items))
+      fail("Property 'attributes' must be array");
+
+    for (var i = 0; i < items.length; i++) {
+      const item = items[i];
+      const name = item.name;
+      const type = item.type;
+
+      if (!/^(?:flag|string|string\[\])$/.test(type))
+        fail(`Unknown attribute type '${type}'`);
+
+      const obj = {
+        name: name,
+        type: type,
+        doc : item.doc || ""
+      };
+
+      this._attributes[name] = obj;
+    }
+  }
+
+  _addSpecialRegs(items) {
+    if (!Array.isArray(items))
+      fail("Property 'specialRegs' must be array");
+
+    for (var i = 0; i < items.length; i++) {
+      const item = items[i];
+      const name = item.name;
+
+      const obj = {
+        name: name,
+        doc : item.doc || ""
+      };
+
+      this._specialRegs[name] = obj;
+    }
+  }
+
+  _addShortcuts(items) {
+    if (!Array.isArray(items))
+      fail("Property 'shortcuts' must be array");
+
+    for (var i = 0; i < items.length; i++) {
+      const item = items[i];
+      const name = item.name;
+
+      const obj = {
+        name: name,
+        doc : item.doc || ""
+      };
+
+      this._specialRegs[name] = obj;
+    }
+  }
+
+  _addInstructions(instructions) {
     for (var i = 0; i < instructions.length; i++) {
       const tuple = instructions[i];
       const names = tuple[kIndexName].split("/");
 
       for (var j = 0; j < names.length; j++) {
-        this.addInstruction(
-          this.createInstruction(
+        this._addInstruction(
+          this._createInstruction(
             names[j], tuple[kIndexOperands], tuple[kIndexEncoding], tuple[kIndexOpcode], tuple[kIndexMetadata]));
       }
     }
@@ -189,7 +406,7 @@ class BaseDB {
     return this;
   }
 
-  addInstruction(inst) {
+  _addInstruction(inst) {
     var group;
 
     if (hasOwn.call(this.map, inst.name)) {

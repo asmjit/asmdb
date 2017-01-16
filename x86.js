@@ -16,12 +16,11 @@ const hasOwn = Object.prototype.hasOwnProperty;
 // Creates an Object without a prototype (used as a map).
 function dict() { return Object.create(null); }
 
-function mapFromArray(arr) {
-  const map = dict();
-  for (var i = 0; i < arr.length; i++)
-    map[arr[i]] = true;
-  return map;
-}
+// If something failed...
+function fail(msg) { throw new Error("[X86] " + msg); }
+
+// Replaces default arguments object (if not provided).
+const NoObject = Object.freeze({});
 
 // Build an object containing CPU registers as keys mapping them to type, kind, and index.
 function buildCpuRegs(defs) {
@@ -61,10 +60,7 @@ function buildCpuRegs(defs) {
 // [Constants]
 // ============================================================================
 
-const kCpuArchitecture = mapFromArray(x86data.architectures);
-const kCpuFeatures     = mapFromArray(x86data.features);
-const kCpuRegisters    = buildCpuRegs(x86data.registers);
-
+const kCpuRegisters = buildCpuRegs(x86data.registers);
 const kCpuFlags = {
   "OF": true, // Overflow flag.
   "SF": true, // Sign flag.
@@ -311,8 +307,8 @@ x86.Operand = Operand;
 
 // X86/X64 instruction.
 class Instruction extends base.BaseInstruction {
-  constructor(name, operands, encoding, opcode, metadata) {
-    super();
+  constructor(db, name, operands, encoding, opcode, metadata) {
+    super(db);
 
     this.name = name;
     this.prefix = "";          // Prefix - "", "3DNOW", "EVEX", "VEX", "XOP".
@@ -330,12 +326,7 @@ class Instruction extends base.BaseInstruction {
     this.ri = false;           // Instruction opcode is combined with register, "XX+r" or "XX+i".
     this.rel = 0;              // Displacement (cb cw cd parts).
 
-    this.lock = false;         // Can be used with LOCK prefix.
-    this.rep = false;          // Can be used with REP prefix.
-    this.repz = false;         // Can be used with REPE/REPZ prefix.
-    this.repnz = false;        // Can be used with REPNE/REPNZ prefix.
     this.xcr = "";             // Reads or writes to/from XCR register.
-
     this.privilege = 3;        // Privilege level required to execute the instruction.
 
     this.fpuTop = 0;           // FPU top index manipulation [-1, 0, 1, 2].
@@ -355,8 +346,6 @@ class Instruction extends base.BaseInstruction {
 
     this.tupleType = "";       // AVX-512 tuple-type.
     this.elementSize = -1;     // Instruction's element size.
-    this.invalid = 0;          // Number of problems detected by asmdb.x86.DB.
-    this.eflags = dict();      // CPU flags read/written/zeroed/set/undefined.
 
     this._assignOperands(operands);
     this._assignEncoding(encoding);
@@ -378,7 +367,7 @@ class Instruction extends base.BaseInstruction {
         break;
 
       // Get the `flag` and remove from `s`.
-      this._assignFlag(s.substring(a + 1, b), true);
+      this._assignAttribute(s.substring(a + 1, b), true);
       s = s.substr(0, a) + s.substr(b + 1);
     }
 
@@ -390,7 +379,7 @@ class Instruction extends base.BaseInstruction {
 
       // Propagate broadcast.
       if (operand.bcstSize > 0)
-        this._assignFlag("broadcast", operand.bcstSize);
+        this._assignAttribute("broadcast", operand.bcstSize);
 
       // Propagate implicit operand.
       if (operand.implicit)
@@ -597,52 +586,30 @@ class Instruction extends base.BaseInstruction {
       this.report(`Couldn't parse instruction's opcode '${this.opcodeString}'`);
   }
 
-  _assignMetadata(s) {
-    // Parse individual flags separated by spaces.
-    var flags = s.split(" ");
+  _assignSpecificAttribute(name, value) {
+    const db = this.db;
 
-    for (var i = 0; i < flags.length; i++) {
-      var flag = flags[i].trim();
-      if (!flag) continue;
-
-      var j = flag.indexOf("=");
-      if (j !== -1)
-        this._assignFlag(flag.substr(0, j), flag.substr(j + 1));
-      else
-        this._assignFlag(flag, true);
-    }
-  }
-
-  _assignFlag(name, value) {
     // Basics.
-    if (kCpuArchitecture[name] === true) { this.arch         = name ; return; }
-    if (kCpuFeatures[name]     === true) { this.cpu[name]    = true ; return; }
-    if (kCpuFlags[name]        === true) { this.eflags[name] = value; return; }
+    if (name == "X86" || name === "X64" || name === "ANY") {
+      this.arch = name;
+      return;
+    }
 
-    // Split AVX-512 flag having "-VL" suffix (shorthand) into two flags.
-    if (/^AVX512\w+-VL$/.test(name) && kCpuFeatures[name.substr(0, name.length - 3)] === true) {
-      var cpuFlag = name.substr(0, name.length - 3);
-      this.cpu[cpuFlag] = true;
-      this.cpu.AVX512_VL = true;
+    // AVX-512 flag followed by "-VL" suffix is a combination of two extensions.
+    if (/^AVX512\w+-VL$/.test(name) && db.extensions[name.substr(0, name.length - 3)]) {
+      const ext = name.substr(0, name.length - 3);
+      this.extensions[ext] = true;
+      this.extensions.AVX512_VL = true;
       return;
     }
 
     switch (name) {
-      case "LOCK"     : this.lock     = true; return;
-      case "REP"      : this.rep      = true; return;
-      case "REPZ"     : this.repz     = true; return;
-      case "REPNZ"    : this.repnz    = true; return;
       case "FPU"      : this.fpu      = true; return;
       case "XCR"      : this.xcr      = value; return;
-
       case "kz"       : this.zmask    = true; // fall: {kz} implies {k}.
       case "k"        : this.kmask    = true; return;
       case "er"       : this.rnd      = true; // fall: {er} implies {sae}.
       case "sae"      : this.sae      = true; return;
-
-      case "VOLATILE" :
-        this.volatile = true;
-        return;
 
       case "PRIVILEGE":
         if (!/^L[0123]$/.test(value))
@@ -770,11 +737,6 @@ class Instruction extends base.BaseInstruction {
 
     return n;
   }
-
-  report(msg) {
-    console.log(`asmdb.x86.Instruction: ${this}: ${msg}`);
-    this.invalid++;
-  }
 }
 x86.Instruction = Instruction;
 
@@ -785,17 +747,20 @@ x86.Instruction = Instruction;
 // X86/X64 instruction database - stores Instruction instances in a map and
 // aggregates all instructions with the same name.
 class DB extends base.BaseDB {
-  constructor() {
-    super();
+  constructor(args) {
+    super(args);
+
+    if (!args)
+      args = NoObject;
+
+    if (args.builtins !== false)
+      this.addData(x86data);
+
+    this.addData(args);
   }
 
-  createInstruction(name, operands, encoding, opcode, metadata) {
-    return new Instruction(name, operands, encoding, opcode, metadata);
-  }
-
-  addDefault() {
-    this.addInstructions(x86data.instructions);
-    return this;
+  _createInstruction(name, operands, encoding, opcode, metadata) {
+    return new Instruction(this, name, operands, encoding, opcode, metadata);
   }
 }
 x86.DB = DB;

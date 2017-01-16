@@ -6,6 +6,11 @@ This is a public domain instruction-set database that contains the following arc
   * X86 (X86/X64) (from legacy instructions up to AVX-512).
   * ARM (T16/T32/A32/A64) (work-in-progress).
 
+NOTE
+----
+
+There is currently work-in-progress to more standardize the database between various architectures, expect some data changes.
+
 X86 Database
 ------------
 
@@ -52,7 +57,7 @@ The following snippet shows a basic usage of a `asmdb.x86.DB()`:
 ```js
 // This creates an `asmdb.x86.DB` instance populated with the data provided by `x86data.js`.
 const asmdb = require("asmdb");
-const x86db = new asmdb.x86.DB().addDefault();
+const x86db = new asmdb.x86.DB();
 
 // Returns an array of instruction names stored in the database:
 console.log(x86db.getInstructionNames());
@@ -99,7 +104,7 @@ The snippet above just shown how to get instructions and list basic properties. 
 
 ```js
 const asmdb = require("asmdb");
-const x86db = new asmdb.x86.DB().addDefault();
+const x86db = new asmdb.x86.DB();
 
 // Get some instruction (the first in the group):
 const inst = x86db.getGroup("vpunpckhbw")[0];
