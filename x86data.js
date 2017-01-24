@@ -13,14 +13,6 @@
 // }
 
 
-// DESCRIPTION
-// -----------
-//
-// These tables can be used for any purpose. The idea is to have an instruction DB
-// that can be used to generate tables used by assemblers and disassemblers, and
-// also to have data that can be used to generate instruction tables for developers.
-
-
 // INSTRUCTIONS
 // ------------
 //
@@ -30,7 +22,7 @@
 //   [1] - Instruction operands.
 //   [2] - Instruction encoding.
 //   [3] - Instruction opcode.
-//   [4] - Instruction metadata - CPU requirements, EFLAGS (read/write), and other metadata.
+//   [4] - Instruction metadata - CPU requirements, FLAGS (read/write), and other metadata.
 //
 // The definition tries to match Intel and AMD instruction set manuals, but there
 // are small differences to make the definition more informative and compact.
@@ -172,6 +164,7 @@ $export[$as] =
 
   "attributes": [
     { "name": "LOCK"             , "type": "flag"        , "doc": "Can be used with LOCK prefix." },
+    { "name": "IMPLICIT_LOCK"    , "type": "flag"        , "doc": "Instruction is always atomic, regardless of use of the LOCK prefix." },
     { "name": "REP"              , "type": "flag"        , "doc": "Can be used with REP prefix." },
     { "name": "REPZ"             , "type": "flag"        , "doc": "Can be used with REPE/REPZ prefix." },
     { "name": "REPNZ"            , "type": "flag"        , "doc": "Can be used with REPNE/REPNZ prefix." },
@@ -188,11 +181,11 @@ $export[$as] =
     { "name": "FLAGS.IF"         , "group": "FLAGS.IF"   , "doc": "Interrupt enable flag." },
     { "name": "FLAGS.DF"         , "group": "FLAGS.DF"   , "doc": "Direction flag." },
     { "name": "FLAGS.OF"         , "group": "FLAGS.OF"   , "doc": "Overflow flag." },
+    { "name": "FLAGS.AC"         , "group": "FLAGS.AC"   , "doc": "Alignment check flag." },
     { "name": "FLAGS.IOPL"       , "group": "FLAGS.SYS"  , "doc": "I/O privilege level." },
     { "name": "FLAGS.NT"         , "group": "FLAGS.SYS"  , "doc": "Nested task flag." },
     { "name": "FLAGS.RF"         , "group": "FLAGS.SYS"  , "doc": "Resume flag." },
     { "name": "FLAGS.VM"         , "group": "FLAGS.SYS"  , "doc": "Virtual 8086 mode flag." },
-    { "name": "FLAGS.AC"         , "group": "FLAGS.SYS"  , "doc": "Alignment check flag." },
     { "name": "FLAGS.VIF"        , "group": "FLAGS.SYS"  , "doc": "Virtual interrupt flag." },
     { "name": "FLAGS.VIP"        , "group": "FLAGS.SYS"  , "doc": "Virtual interrupt pending." },
     { "name": "FLAGS.CPUID"      , "group": "FLAGS.SYS"  , "doc": "CPUID instruction available." },
@@ -203,8 +196,8 @@ $export[$as] =
     { "name": "X87CW.OVERFLOW"   , "group": "X87CW.EXC"  , "doc": "Overflow exception enable bit." },
     { "name": "X87CW.UNDERFLOW"  , "group": "X87CW.EXC"  , "doc": "Underflow exception enable bit." },
     { "name": "X87CW.PRECISION"  , "group": "X87CW.EXC"  , "doc": "Lost of precision exception enable bit." },
-    { "name": "X87CW.PC"         , "group": "X87CW.MODE" , "doc": "Precision control." },
-    { "name": "X87CW.RC"         , "group": "X87CW.MODE" , "doc": "Rounding control." },
+    { "name": "X87CW.PC"         , "group": "X87CW.PC"   , "doc": "Precision control." },
+    { "name": "X87CW.RC"         , "group": "X87CW.RC"   , "doc": "Rounding control." },
 
     { "name": "X87SW.INVALID_OP" , "group": "X87SW.EXC"  , "doc": "Invalid operation exception flag." },
     { "name": "X87SW.DENORMAL"   , "group": "X87SW.EXC"  , "doc": "Dernormalized exception flag." },
@@ -217,8 +210,10 @@ $export[$as] =
     { "name": "X87SW.C0"         , "group": "X87SW.C0"   , "doc": "C0 condifion." },
     { "name": "X87SW.C1"         , "group": "X87SW.C1"   , "doc": "C1 condifion." },
     { "name": "X87SW.C2"         , "group": "X87SW.C2"   , "doc": "C2 condifion." },
-    { "name": "X87SW.TOP"        , "group": "X87SW.TOP"  , "doc": "Top of the stack." },
-    { "name": "X87SW.C3"         , "group": "X87SW.C3"   , "doc": "C3 condifion." }
+    { "name": "X87SW.TOP"        , "group": "X87SW.TOP"  , "doc": "Top of the FPU stack." },
+    { "name": "X87SW.C3"         , "group": "X87SW.C3"   , "doc": "C3 condifion." },
+
+    { "name": "XCR"              , "group": "XCR"        , "doc": "XCR register." }
   ],
 
   "shortcuts": [
@@ -389,7 +384,7 @@ $export[$as] =
     ["cdq"              , "W:<edx>, <eax>"                           , "NONE"    , "99"                               , "ANY"],
     ["cqo"              , "W:<rdx>, <rax>"                           , "NONE"    , "REX.W 99"                         , "X64"],
 
-    ["clac"             , ""                                         , "NONE"    , "0F 01 CA"                         , "ANY VOLATILE SMAP AC=0"],
+    ["clac"             , ""                                         , "NONE"    , "0F 01 CA"                         , "ANY VOLATILE SMAP FLAGS.AC=0"],
     ["clc"              , ""                                         , "NONE"    , "F8"                               , "ANY CF=0"],
     ["cld"              , ""                                         , "NONE"    , "FC"                               , "ANY DF=0"],
     ["cmc"              , ""                                         , "NONE"    , "F5"                               , "ANY CF=X"],
@@ -959,7 +954,7 @@ $export[$as] =
     ["shrd"             , "r64/m64, r64, ib"                         , "MRI"     , "REX.W 0F AC /r ib"                , "X64 OF=W SF=W ZF=W AF=U PF=W CF=W"],
     ["shrd"             , "r64/m64, r64, cl"                         , "MR"      , "REX.W 0F AD /r"                   , "X64 OF=W SF=W ZF=W AF=U PF=W CF=W"],
 
-    ["stac"             , ""                                         , "NONE"    , "0F 01 CB"                         , "ANY VOLATILE SMAP AC=1"],
+    ["stac"             , ""                                         , "NONE"    , "0F 01 CB"                         , "ANY VOLATILE SMAP FLAGS.AC=1"],
     ["stc"              , ""                                         , "NONE"    , "F9"                               , "ANY CF=1"],
     ["std"              , ""                                         , "NONE"    , "FD"                               , "ANY DF=1"],
     ["sti"              , ""                                         , "NONE"    , "FB"                               , "ANY VOLATILE IF=1"],
@@ -1024,23 +1019,23 @@ $export[$as] =
     ["xadd"             , "X:r32/m32, X:r32"                         , "MR"      , "0F C1 /r"                         , "ANY I486 LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
     ["xadd"             , "X:r64/m64, X:r64"                         , "MR"      , "REX.W 0F C1 /r"                   , "X64 I486 LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
 
-    ["xchg"             , "X:ax, X:r16"                              , "O"       , "66 90+r"                          , "ANY LOCK"],
-    ["xchg"             , "X:eax, X:r32"                             , "O"       , "90+r"                             , "ANY LOCK"],
-    ["xchg"             , "X:rax, X:r64"                             , "O"       , "REX.W 90+r"                       , "X64 LOCK"],
+    ["xchg"             , "X:ax, X:r16"                              , "O"       , "66 90+r"                          , "ANY LOCK IMPLICIT_LOCK"],
+    ["xchg"             , "X:eax, X:r32"                             , "O"       , "90+r"                             , "ANY LOCK IMPLICIT_LOCK"],
+    ["xchg"             , "X:rax, X:r64"                             , "O"       , "REX.W 90+r"                       , "X64 LOCK IMPLICIT_LOCK"],
 
-    ["xchg"             , "X:r16, X:ax"                              , "O"       , "66 90+r"                          , "ANY LOCK"],
-    ["xchg"             , "X:r32, X:eax"                             , "O"       , "90+r"                             , "ANY LOCK"],
-    ["xchg"             , "X:r64, X:rax"                             , "O"       , "REX.W 90+r"                       , "X64 LOCK"],
+    ["xchg"             , "X:r16, X:ax"                              , "O"       , "66 90+r"                          , "ANY LOCK IMPLICIT_LOCK"],
+    ["xchg"             , "X:r32, X:eax"                             , "O"       , "90+r"                             , "ANY LOCK IMPLICIT_LOCK"],
+    ["xchg"             , "X:r64, X:rax"                             , "O"       , "REX.W 90+r"                       , "X64 LOCK IMPLICIT_LOCK"],
 
-    ["xchg"             , "X:r8/m8, X:r8"                            , "MR"      , "86 /r"                            , "ANY LOCK"],
-    ["xchg"             , "X:r16/m16, X:r16"                         , "MR"      , "66 87 /r"                         , "ANY LOCK"],
-    ["xchg"             , "X:r32/m32, X:r32"                         , "MR"      , "87 /r"                            , "ANY LOCK"],
-    ["xchg"             , "X:r64/m64, X:r64"                         , "MR"      , "REX.W 87 /r"                      , "X64 LOCK"],
+    ["xchg"             , "X:r8/m8, X:r8"                            , "MR"      , "86 /r"                            , "ANY LOCK IMPLICIT_LOCK"],
+    ["xchg"             , "X:r16/m16, X:r16"                         , "MR"      , "66 87 /r"                         , "ANY LOCK IMPLICIT_LOCK"],
+    ["xchg"             , "X:r32/m32, X:r32"                         , "MR"      , "87 /r"                            , "ANY LOCK IMPLICIT_LOCK"],
+    ["xchg"             , "X:r64/m64, X:r64"                         , "MR"      , "REX.W 87 /r"                      , "X64 LOCK IMPLICIT_LOCK"],
 
-    ["xchg"             , "X:r8, X:r8/m8"                            , "RM"      , "86 /r"                            , "ANY LOCK"],
-    ["xchg"             , "X:r16, X:r16/m16"                         , "RM"      , "66 87 /r"                         , "ANY LOCK"],
-    ["xchg"             , "X:r32, X:r32/m32"                         , "RM"      , "87 /r"                            , "ANY LOCK"],
-    ["xchg"             , "X:r64, X:r64/m64"                         , "RM"      , "REX.W 87 /r"                      , "X64 LOCK"],
+    ["xchg"             , "X:r8, X:r8/m8"                            , "RM"      , "86 /r"                            , "ANY LOCK IMPLICIT_LOCK"],
+    ["xchg"             , "X:r16, X:r16/m16"                         , "RM"      , "66 87 /r"                         , "ANY LOCK IMPLICIT_LOCK"],
+    ["xchg"             , "X:r32, X:r32/m32"                         , "RM"      , "87 /r"                            , "ANY LOCK IMPLICIT_LOCK"],
+    ["xchg"             , "X:r64, X:r64/m64"                         , "RM"      , "REX.W 87 /r"                      , "X64 LOCK IMPLICIT_LOCK"],
 
     ["xor"              , "al, ib"                                   , "I"       , "34 ib"                            , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
     ["xor"              , "ax, iw"                                   , "I"       , "66 35 iw"                         , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],

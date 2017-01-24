@@ -8,7 +8,7 @@
 "use strict";
 
 const arm = $export[$as] = {};
-const base = $export.armdata ? $export.base : require("./base.js");
+const base = $export.base ? $export.base : require("./base.js");
 const armdata = $export.armdata ? $export.armdata : require("./armdata.js");
 
 // Creates an Object without a prototype (used as a map).
@@ -87,7 +87,7 @@ const FieldInfo = {
 // ARM utilities.
 class Utils {
   static parseShiftOp(s) {
-    if (/^(Sop|LSL|LSR|ASR|ROR|RRX) /.test(s))
+    if (/^(?:Sop|LSL|LSR|ASR|ROR|RRX) /.test(s))
       return s.substr(0, 3);
     else
       return "";
@@ -548,10 +548,10 @@ class Instruction extends base.BaseInstruction {
 arm.Instruction = Instruction;
 
 // ============================================================================
-// [asmdb.arm.DB]
+// [asmdb.arm.ISA]
 // ============================================================================
 
-class DB extends base.BaseDB {
+class ISA extends base.BaseISA {
   constructor(args) {
     super(args);
 
@@ -568,7 +568,7 @@ class DB extends base.BaseDB {
     return new Instruction(this, name, operands, encoding, opcode, metadata);
   }
 }
-arm.DB = DB;
+arm.ISA = ISA;
 
 }).apply(this, typeof module === "object" && module && module.exports
   ? [module, "exports"] : [this.asmdb || (this.asmdb = {}), "arm"]);

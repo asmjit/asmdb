@@ -8,7 +8,7 @@
 "use strict";
 
 const x86 = $export[$as] = {};
-const base = $export.x86data ? $export.base : require("./base.js");
+const base = $export.base ? $export.base : require("./base.js");
 const x86data = $export.x86data ? $export.x86data : require("./x86data.js");
 
 const hasOwn = Object.prototype.hasOwnProperty;
@@ -311,6 +311,7 @@ class Instruction extends base.BaseInstruction {
     super(db);
 
     this.name = name;
+    this.privilege = "L3";     // Privilege level required to execute the instruction.
     this.prefix = "";          // Prefix - "", "3DNOW", "EVEX", "VEX", "XOP".
     this.opcodeHex = "";       // A single opcode byte as hexadecimal string "00-FF".
 
@@ -326,12 +327,8 @@ class Instruction extends base.BaseInstruction {
     this.ri = false;           // Instruction opcode is combined with register, "XX+r" or "XX+i".
     this.rel = 0;              // Displacement (cb cw cd parts).
 
-    this.xcr = "";             // Reads or writes to/from XCR register.
-    this.privilege = 3;        // Privilege level required to execute the instruction.
-
-    this.fpuTop = 0;           // FPU top index manipulation [-1, 0, 1, 2].
     this.fpu = false;          // If the instruction is an FPU instruction.
-    this.mmx = false;          // If the instruction is an MMX instruction.
+    this.fpuTop = 0;           // FPU top index manipulation [-1, 0, 1, 2].
 
     this.vsibReg = "";         // AVX VSIB register type (xmm/ymm/zmm).
     this.vsibSize = -1;        // AVX VSIB register size (32/64).
@@ -592,7 +589,7 @@ class Instruction extends base.BaseInstruction {
     // Basics.
     if (name == "X86" || name === "X64" || name === "ANY") {
       this.arch = name;
-      return;
+      return true;
     }
 
     // AVX-512 flag followed by "-VL" suffix is a combination of two extensions.
@@ -600,38 +597,58 @@ class Instruction extends base.BaseInstruction {
       const ext = name.substr(0, name.length - 3);
       this.extensions[ext] = true;
       this.extensions.AVX512_VL = true;
-      return;
+      return true;
     }
 
     switch (name) {
-      case "FPU"      : this.fpu      = true; return;
-      case "XCR"      : this.xcr      = value; return;
-      case "kz"       : this.zmask    = true; // fall: {kz} implies {k}.
-      case "k"        : this.kmask    = true; return;
-      case "er"       : this.rnd      = true; // fall: {er} implies {sae}.
-      case "sae"      : this.sae      = true; return;
+      case "FPU":
+        this.fpu = true;
+        return true;
+
+      case "kz":
+        this.zmask = true;
+        // fall: {kz} implies {k}.
+      case "k":
+        this.kmask = true;
+        return true;
+
+      case "er":
+        this.rnd = true;
+        // fall: {er} implies {sae}.
+      case "sae":
+        this.sae = true;
+        return true;
 
       case "PRIVILEGE":
         if (!/^L[0123]$/.test(value))
           this.report(`${this.name}: Invalid privilege level '${value}'`);
 
-        this.privilege = parseInt(value.substr(1), 10);
-        return;
+        this.privilege = value;
+        return true;
 
       case "broadcast":
         this.broadcast = true;
         this.elementSize = value;
-        return;
+        return true;
 
-      case "FPU_PUSH" : this.fpu = true; this.fpuTop = -1; return;
-      case "FPU_POP"  : this.fpu = true; this.fpuTop = Number(value); return;
-      case "FPU_TOP"  : this.fpu = true;
-        if (value === "-1") { this.fpuTop =-1; return; }
-        if (value === "+1") { this.fpuTop = 1; return; }
+      case "FPU_PUSH" :
+        this.fpu = true;
+        this.fpuTop = -1;
+        return true;
+
+      case "FPU_POP":
+        this.fpu = true;
+        this.fpuTop = Number(value);
+        return true;
+
+      case "FPU_TOP":
+        this.fpu = true;
+        if (value === "-1") { this.fpuTop =-1; return true; }
+        if (value === "+1") { this.fpuTop = 1; return true; }
         break;
     }
 
-    this.report(`${this.name}: Unhandled flag ${name}=${value}`);
+    return false;
   }
 
   // Validate the instruction's definition. Common mistakes can be checked and
@@ -741,12 +758,12 @@ class Instruction extends base.BaseInstruction {
 x86.Instruction = Instruction;
 
 // ============================================================================
-// [asmdb.x86.DB]
+// [asmdb.x86.ISA]
 // ============================================================================
 
 // X86/X64 instruction database - stores Instruction instances in a map and
 // aggregates all instructions with the same name.
-class DB extends base.BaseDB {
+class ISA extends base.BaseISA {
   constructor(args) {
     super(args);
 
@@ -763,7 +780,7 @@ class DB extends base.BaseDB {
     return new Instruction(this, name, operands, encoding, opcode, metadata);
   }
 }
-x86.DB = DB;
+x86.ISA = ISA;
 
 // ============================================================================
 // [asmdb.x86.X86DataCheck]
@@ -771,7 +788,7 @@ x86.DB = DB;
 
 class X86DataCheck {
   static checkVexEvex(db) {
-    const map = db.map;
+    const map = db.instructionMap;
     for (var name in map) {
       const insts = map[name];
       for (var i = 0; i < insts.length; i++) {

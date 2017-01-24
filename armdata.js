@@ -13,14 +13,6 @@
 // }
 
 
-// DESCRIPTION
-// -----------
-//
-// These tables can be used for any purpose. The idea is to have an instruction DB
-// that can be used to generate tables used by assemblers and disassemblers, and
-// also to have data that can be used to generate instruction tables for developers.
-
-
 // INSTRUCTION TUPLE
 // -----------------
 //
@@ -177,7 +169,7 @@ $export[$as] =
 
   "specialRegs": [
     { "name": "APSR.N"           , "group": "APSR.N"     , "doc": "Negative flag." },
-    { "name": "APSR.Z"           , "group": "APSR.Z"     , "doc": "Zero flag" },
+    { "name": "APSR.Z"           , "group": "APSR.Z"     , "doc": "Zero flag." },
     { "name": "APSR.C"           , "group": "APSR.C"     , "doc": "Carry or unsigned overflow flag." },
     { "name": "APSR.V"           , "group": "APSR.V"     , "doc": "Signed overflow flag." },
     { "name": "APSR.Q"           , "group": "APSR.Q"     , "doc": "Sticky saturation flag." },
@@ -194,8 +186,8 @@ $export[$as] =
 
     { "name": "IPSR.N"           , "group": "IPSR.N"     , "doc": "ISR number." },
 
-    { "name": "FPCSR.N"          , "group": "FPCSR.N"    , "doc": "less than flag." },
-    { "name": "FPCSR.Z"          , "group": "FPCSR.Z"    , "doc": "equal flag." },
+    { "name": "FPCSR.N"          , "group": "FPCSR.N"    , "doc": "Less than flag." },
+    { "name": "FPCSR.Z"          , "group": "FPCSR.Z"    , "doc": "Equal flag." },
     { "name": "FPCSR.C"          , "group": "FPCSR.C"    , "doc": "Equal, greater than, or unordered flag." },
     { "name": "FPCSR.V"          , "group": "FPCSR.V"    , "doc": "Unordered flag." },
     { "name": "FPCSR.Q"          , "group": "FPCSR.Q"    , "doc": "Sticky saturation flag." },
@@ -682,8 +674,8 @@ $export[$as] =
     ["mvnS"             , "Rd!=XX, #ImmC"                               , "T32", "1111|0|ImmC:1|0|0011|1|1111|0|ImmC:3|Rd|ImmC:8"         , "ARMv6T2+ IT=ANY APSR.NZC=W"],
     ["mvn"              , "Rd    , #ImmC"                               , "A32", "Cond|001|1111|0|0000|Rd|ImmC:12"                        , "ARMv4+"],
     ["mvnS"             , "Rd!=PC, #ImmC"                               , "A32", "Cond|001|1111|1|0000|Rd|ImmC:12"                        , "ARMv4+ APSR.NZC=W"],
-    ["mvn"              , "Rd!=HI, Rn!=HI"                              , "T16", "0100|001|111|Rm:3|Rd:3"                                 , "ARMv4T+ IT=IN"],
-    ["mvnS"             , "Rd!=HI, Rn!=HI"                              , "T16", "0100|001|111|Rm:3|Rd:3"                                 , "ARMv4T+ IT=OUT APSR.NZC=W"],
+    ["mvn"              , "Rd!=HI, Rn!=HI"                              , "T16", "0100|001|111|Rn:3|Rd:3"                                 , "ARMv4T+ IT=IN"],
+    ["mvnS"             , "Rd!=HI, Rn!=HI"                              , "T16", "0100|001|111|Rn:3|Rd:3"                                 , "ARMv4T+ IT=OUT APSR.NZC=W"],
     ["mvn"              , "Rd!=XX, Rn!=XX, {Sop #Shift}"                , "T32", "1110|101|0011|0|1111|0|Shift:3|Rd|Shift:2|Sop:2|Rn"     , "ARMv6T2+ IT=ANY"],
     ["mvnS"             , "Rd!=XX, Rn!=XX, {Sop #Shift}"                , "T32", "1110|101|0011|1|1111|0|Shift:3|Rd|Shift:2|Sop:2|Rn"     , "ARMv6T2+ IT=ANY APSR.NZC=W"],
     ["mvn"              , "Rd    , Rn    , {Sop #Shift}"                , "A32", "Cond|000|1111|0|0000|Rd|Shift:5|Sop:2|0|Rn"             , "ARMv4+"],
@@ -1641,13 +1633,13 @@ $export[$as] =
 
     ["vcvta.s32.f32"    , "Sd, Sn"                                      , "T32", "1111|11101|'Vd|11|11|00|Vd|10101|1|Vn'|0|Vn"            , "ARMv8+"],
     ["vcvta.s32.f32"    , "Sd, Sn"                                      , "A32", "1111|11101|'Vd|11|11|00|Vd|10101|1|Vn'|0|Vn"            , "ARMv8+"],
-    ["vcvta.s32.f64"    , "Dd, Dn"                                      , "T32", "1111|11101|'Vd|11|11|00|Vd|10111|1|Vn'|0|Vn"            , "ARMv8+"],
-    ["vcvta.s32.f64"    , "Dd, Dn"                                      , "A32", "1111|11101|'Vd|11|11|00|Vd|10111|1|Vn'|0|Vn"            , "ARMv8+"],
+    ["vcvta.s32.f64"    , "Sd, Dn"                                      , "T32", "1111|11101|'Vd|11|11|00|Vd|10111|1|Vn'|0|Vn"            , "ARMv8+"],
+    ["vcvta.s32.f64"    , "Sd, Dn"                                      , "A32", "1111|11101|'Vd|11|11|00|Vd|10111|1|Vn'|0|Vn"            , "ARMv8+"],
 
     ["vcvta.u32.f32"    , "Sd, Sn"                                      , "T32", "1111|11101|'Vd|11|11|00|Vd|10100|1|Vn'|0|Vn"            , "ARMv8+"],
     ["vcvta.u32.f32"    , "Sd, Sn"                                      , "A32", "1111|11101|'Vd|11|11|00|Vd|10100|1|Vn'|0|Vn"            , "ARMv8+"],
-    ["vcvta.u32.f64"    , "Dd, Dn"                                      , "T32", "1111|11101|'Vd|11|11|00|Vd|10110|1|Vn'|0|Vn"            , "ARMv8+"],
-    ["vcvta.u32.f64"    , "Dd, Dn"                                      , "A32", "1111|11101|'Vd|11|11|00|Vd|10110|1|Vn'|0|Vn"            , "ARMv8+"],
+    ["vcvta.u32.f64"    , "Sd, Dn"                                      , "T32", "1111|11101|'Vd|11|11|00|Vd|10110|1|Vn'|0|Vn"            , "ARMv8+"],
+    ["vcvta.u32.f64"    , "Sd, Dn"                                      , "A32", "1111|11101|'Vd|11|11|00|Vd|10110|1|Vn'|0|Vn"            , "ARMv8+"],
 
     ["vcvtb.f32.f16"    , "Sd, Sn"                                      , "T32", "1110|11101|'Vd|11|00|10|Vd|10100|1|'Vn|0|Vn"            , "VFPv3_FP16"],
     ["vcvtb.f32.f16"    , "Sd, Sn"                                      , "A32", "Cond|11101|'Vd|11|00|10|Vd|10100|1|'Vn|0|Vn"            , "VFPv3_FP16"],

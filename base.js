@@ -17,7 +17,8 @@ function dict() { return Object.create(null); }
 function fail(msg) { throw new Error("[BASE] " + msg); }
 
 // Replaces default arguments object (if not provided).
-const NoObject = Object.freeze({});
+const NoObject = Object.freeze(Object.create(null));
+const NoArray = Object.freeze([]);
 
 // Indexes used by instruction-data.
 const kIndexName     = 0;
@@ -139,6 +140,7 @@ class BaseInstruction {
     this.encoding = "";        // Encoding type.
 
     this.implicit = false;     // Uses implicit operands (registers / memory).
+    this.privilege = "";       // Privilege required to execute the instruction.
 
     this.opcodeString = "";    // Instruction opcode as specified in manual.
     this.opcodeValue = 0;      // Instruction opcode as number (arch dependent).
@@ -252,22 +254,20 @@ class BaseInstruction {
 base.BaseInstruction = BaseInstruction;
 
 // ============================================================================
-// [asmdb.base.BaseDB]
+// [asmdb.base.BaseISA]
 // ============================================================================
 
-class BaseDB {
+class BaseISA {
   constructor() {
-    this._cpuLevels = dict();
-    this._extensions = dict();
-    this._attributes = dict();
-    this._specialRegs = dict();
-    this._shortcuts = dict();
+    this._cpuLevels = dict();            // Architecture versions.
+    this._extensions = dict();           // Architecture extensions.
+    this._attributes = dict();           // Instruction attributes.
+    this._specialRegs = dict();          // Special registers.
+    this._shortcuts = dict();            // Shortcuts used by instructions metadata.
 
-    // Maps an instruction name to an array of all Instruction instances.
-    this.map = Object.create(null);
-
-    // List of instruction names (sorted), regenerated when needed.
-    this.instructionNames = null;
+    this._instructions = null;           // Instruction array (contains all instructions).
+    this._instructionNames = null;       // Instruction names (sorted), regenerated when needed.
+    this._instructionMap = dict();       // Instruction name to `Instruction[]` mapping.
 
     // Statistics.
     this.stats = {
@@ -276,18 +276,105 @@ class BaseDB {
     };
   }
 
-  get cpuLevels() { return this._cpuLevels; }
-  get extensions() { return this._extensions; }
-  get attributes() { return this._attributes; }
-  get specialRegs() { return this._specialRegs; }
-  get shortcuts() { return this._shortcuts; }
-
-  _createInstruction(name, operands, encoding, opcode, metadata) {
-    fail("Abstract method called");
+  get cpuLevels() {
+    return this._cpuLevels;
   }
 
-  addDefault() {
-    fail("DB.addDefault() - Instructions are added by default, use new DB({ builtins: false }) to turn this feature off");
+  get extensions() {
+    return this._extensions;
+  }
+
+  get attributes() {
+    return this._attributes;
+  }
+
+  get specialRegs() {
+    return this._specialRegs;
+  }
+
+  get shortcuts() {
+    return this._shortcuts;
+  }
+
+  get instructions() {
+    var array = this._instructions;
+    if (array === null) {
+      array = [];
+      const map = this.instructionMap;
+      const names = this.instructionNames;
+      for (var i = 0; i < names.length; i++)
+        array.push.apply(array, map[names[i]]);
+      this._instructions = array;
+    }
+    return array;
+  }
+
+  get instructionNames() {
+    var names = this._instructionNames;
+    if (names === null) {
+      names = Object.keys(this._instructionMap);
+      names.sort();
+      this._instructionNames = names;
+    }
+    return names;
+  }
+
+  get instructionMap() {
+    return this._instructionMap;
+  }
+
+  query(args, copy) {
+    if (typeof args !== "object" || !args || Array.isArray(args))
+      return this._queryByName(args, copy);
+
+    const filter = args.filter;
+    if (filter)
+      copy = false;
+
+    var result = this._queryByName(args.name, copy);
+    if (filter)
+      result = result.filter(filter, args.filterThis);
+
+    return result;
+  }
+
+  _queryByName(name, copy) {
+    var result = NoArray;
+    const map = this._instructionMap;
+
+    if (typeof name === "string") {
+      const insts = map[name];
+      if (insts) result = insts;
+      return copy ? result.slice() : result;
+    }
+
+    if (Array.isArray(name)) {
+      const names = name;
+      for (var i = 0; i < names.length; i++) {
+        const insts = map[names[i]];
+        if (!insts) continue;
+
+        if (result === NoArray) result = [];
+        for (var j = 0; j < insts.length; j++)
+          result.push(insts[j]);
+      }
+      return result;
+    }
+
+    result = this.instructions;
+    return copy ? result.slice() : result;
+  }
+
+  forEachGroup(cb, thisArg) {
+    const map = this._instructionMap;
+    const names = this.instructionNames;
+
+    for (var i = 0; i < names.length; i++) {
+      const name = names[i];
+      cb.call(thisArg, name, map[name]);
+    }
+
+    return this;
   }
 
   addData(data) {
@@ -409,66 +496,27 @@ class BaseDB {
   _addInstruction(inst) {
     var group;
 
-    if (hasOwn.call(this.map, inst.name)) {
-      group = this.map[inst.name];
+    if (hasOwn.call(this._instructionMap, inst.name)) {
+      group = this._instructionMap[inst.name];
     }
     else {
-      group = this.map[inst.name] = [];
-      this.instructionNames = null;
+      group = this._instructionMap[inst.name] = [];
+      this._instructionNames = null;
       this.stats.groups++;
     }
 
     group.push(inst);
     this.stats.insts++;
+    this._instructions = null;
 
     return this;
   }
 
-  getGroup(name) {
-    return this.map[name] || null;
-  }
-
-  getInstructionNames() {
-    const map = this.map;
-
-    var names = this.instructionNames;
-    if (names === null) {
-      names = Object.keys(map);
-      names.sort();
-      this.instructionNames = names;
-    }
-
-    return names;
-  }
-
-  forEach(cb, thisArg) {
-    const map = this.map;
-    const names = this.getInstructionNames();
-
-    for (var i = 0; i < names.length; i++) {
-      const name = names[i];
-      const list = map[name];
-
-      for (var j = 0; j < list.length; j++)
-        cb.call(thisArg, name, list[j]);
-    }
-
-    return this;
-  }
-
-  forEachGroup(cb, thisArg) {
-    const map = this.map;
-    const names = this.getInstructionNames();
-
-    for (var i = 0; i < names.length; i++) {
-      const name = names[i];
-      cb.call(thisArg, name, map[name]);
-    }
-
-    return this;
+  _createInstruction(name, operands, encoding, opcode, metadata) {
+    fail("Abstract method called");
   }
 }
-base.BaseDB = BaseDB;
+base.BaseISA = BaseISA;
 
 }).apply(this, typeof module === "object" && module && module.exports
   ? [module, "exports"] : [this.asmdb || (this.asmdb = {}), "base"]);
