@@ -11,6 +11,10 @@ const x86 = $export[$as] = {};
 const base = $export.base ? $export.base : require("./base.js");
 const x86data = $export.x86data ? $export.x86data : require("./x86data.js");
 
+const BaseISA = base.BaseISA;
+const BaseOperand = base.BaseOperand;
+const BaseInstruction = base.BaseInstruction;
+
 const hasOwn = Object.prototype.hasOwnProperty;
 
 // Creates an Object without a prototype (used as a map).
@@ -143,7 +147,7 @@ x86.Utils = Utils;
 // ============================================================================
 
 // X86/X64 operand.
-class Operand extends base.BaseOperand {
+class Operand extends BaseOperand {
   constructor(def, defaultAccess) {
     super(def);
 
@@ -166,37 +170,34 @@ class Operand extends base.BaseOperand {
     this.rwxWidth = -1;        // Read/Write (RWX) width.
 
     const type = [];
+    var s = def;
 
     // Handle RWX decorators prefix in "R|W|X[A:B]:" format.
-    var s = def;
-    var m = /^(R|W|X)(\[(\d+)\:(\d+)\])?\:/.exec(s);
-    if (m) {
+    const mAccess = /^(R|W|X)(\[(\d+)\:(\d+)\])?\:/.exec(s);
+    if (mAccess) {
       // RWX:
-      this.setAccess(m[1]);
+      this.setAccess(mAccess[1]);
 
       // RWX[A:B]:
-      if (m.length > 2) {
-        var a = parseInt(m[2], 10);
-        var b = parseInt(m[3], 10);
+      if (mAccess.length > 2) {
+        var a = parseInt(mAccess[2], 10);
+        var b = parseInt(mAccess[3], 10);
 
         this.rwxIndex = Math.min(a, b);
         this.rwxWidth = Math.abs(a - b) + 1;
       }
 
       // Remove RWX information from the operand's string.
-      s = s.substr(m[0].length);
-    }
-    else {
-      this.setAccess(defaultAccess);
+      s = s.substr(mAccess[0].length);
     }
 
     // Handle AVX-512 broadcast possibility specified as "/bN" suffix.
-    m = /\/b(\d+)/.exec(s);
-    if (m) {
-      this.bcstSize = parseInt(m[1], 10);
+    var mBcst = /\/b(\d+)/.exec(s);
+    if (mBcst) {
+      this.bcstSize = parseInt(mBcst[1], 10);
 
       // Remove broadcast from the operand's definition; it's not needed anymore.
-      s = s.substr(0, m.index) + s.substr(m.index + m[0].length);
+      s = s.substr(0, mBcst.index) + s.substr(mBcst.index + mBcst[0].length);
     }
 
     // Handle an implicit operand.
@@ -231,15 +232,15 @@ class Operand extends base.BaseOperand {
         this.mem = op;
 
         // Handle memory size.
-        m = /^m(?:off)?(\d+)/.exec(op);
-        this.memSize = m ? parseInt(m[1], 10) : 0;
+        const mOff = /^m(?:off)?(\d+)/.exec(op);
+        this.memSize = mOff ? parseInt(mOff[1], 10) : 0;
         this.memOff = op.indexOf("moff") === 0;
 
         // Handle vector addressing mode and size "vmXXr".
-        m = /^vm(\d+)(x|y|z)$/.exec(op);
-        if (m) {
-          this.vsibReg = m[2] + "mm";
-          this.vsibSize = parseInt(m[1], 10);
+        const mVM = /^vm(\d+)(x|y|z)$/.exec(op);
+        if (mVM) {
+          this.vsibReg = mVM[2] + "mm";
+          this.vsibSize = parseInt(mVM[1], 10);
         }
 
         type.push("mem");
@@ -271,6 +272,9 @@ class Operand extends base.BaseOperand {
     // version as we have already processed and stored all the possible decorators.
     this.data = s;
     this.type = type.join("/");
+
+    if (!mAccess && this.isRegOrMem())
+      this.setAccess(defaultAccess);
   }
 
   setAccess(access) {
@@ -306,7 +310,7 @@ x86.Operand = Operand;
 // ============================================================================
 
 // X86/X64 instruction.
-class Instruction extends base.BaseInstruction {
+class Instruction extends BaseInstruction {
   constructor(db, name, operands, encoding, opcode, metadata) {
     super(db);
 
@@ -763,7 +767,7 @@ x86.Instruction = Instruction;
 
 // X86/X64 instruction database - stores Instruction instances in a map and
 // aggregates all instructions with the same name.
-class ISA extends base.BaseISA {
+class ISA extends BaseISA {
   constructor(args) {
     super(args);
 
