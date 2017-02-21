@@ -213,7 +213,7 @@ $export[$as] =
     { "name": "X87SW.TOP"        , "group": "X87SW.TOP"  , "doc": "Top of the FPU stack." },
     { "name": "X87SW.C3"         , "group": "X87SW.C3"   , "doc": "C3 condifion." },
 
-    { "name": "MSR"              , "group": "XCR"        , "doc": "MSR register." },
+    { "name": "MSR"              , "group": "MSR"        , "doc": "MSR register." },
     { "name": "XCR"              , "group": "XCR"        , "doc": "XCR register." }
   ],
 
@@ -996,12 +996,12 @@ $export[$as] =
 
     ["syscall"          , ""                                         , "NONE"    , "0F 05"                            , "X64 VOLATILE"],
     ["sysenter"         , ""                                         , "NONE"    , "0F 34"                            , "ANY VOLATILE"],
-    ["sysexit"          , ""                                         , "NONE"    , "0F 35"                            , "ANY VOLATILE"],
-    ["sysexit64"        , ""                                         , "NONE"    , "REX.W 0F 35"                      , "ANY VOLATILE"],
-    ["sysret"           , ""                                         , "NONE"    , "0F 07"                            , "X64 VOLATILE"],
-    ["sysret64"         , ""                                         , "NONE"    , "REX.W 0F 07"                      , "X64 VOLATILE"],
+    ["sysexit"          , ""                                         , "NONE"    , "0F 35"                            , "ANY VOLATILE PRIVILEGE=L0"],
+    ["sysexit64"        , ""                                         , "NONE"    , "REX.W 0F 35"                      , "ANY VOLATILE PRIVILEGE=L0"],
+    ["sysret"           , ""                                         , "NONE"    , "0F 07"                            , "X64 VOLATILE PRIVILEGE=L0"],
+    ["sysret64"         , ""                                         , "NONE"    , "REX.W 0F 07"                      , "X64 VOLATILE PRIVILEGE=L0"],
 
-    ["swapgs"           , ""                                         , "NONE"    , "0F 01 F8"                         , "X64 VOLATILE"],
+    ["swapgs"           , ""                                         , "NONE"    , "0F 01 F8"                         , "X64 VOLATILE PRIVILEGE=L0"],
 
     ["test"             , "R:al, ib"                                 , "I"       , "A8 ib"                            , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
     ["test"             , "R:ax, iw"                                 , "I"       , "66 A9 iw"                         , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
@@ -1075,8 +1075,8 @@ $export[$as] =
     ["bndcu"            , "R:bnd, r64/m64"                           , "RM"      , "F2 0F 1A /r"                      , "X64 VOLATILE MPX"],
     ["bndldx"           , "W:bnd, mib"                               , "RM"      , "0F 1A /r"                         , "ANY VOLATILE MPX"],
     ["bndmk"            , "W:bnd, mem"                               , "RM"      , "F3 0F 1B /r"                      , "ANY VOLATILE MPX"],
-    ["bndmov"           , "W:bnd, bnd/mem"                           , "RM"      , "66 0F 1A /r"                      , "ANY VOLATILE MPX"],
-    ["bndmov"           , "W:bnd/mem, bnd"                           , "MR"      , "66 0F 1B /r"                      , "ANY VOLATILE MPX"],
+    ["bndmov"           , "W:bnd, bnd/mem"                           , "RM"      , "66 0F 1A /r"                      , "ANY MPX"],
+    ["bndmov"           , "W:bnd/mem, bnd"                           , "MR"      , "66 0F 1B /r"                      , "ANY MPX"],
     ["bndstx"           , "W:mib, bnd"                               , "MR"      , "0F 1B /r"                         , "ANY VOLATILE MPX"],
 
     ["clflush"          , "R:mem"                                    , "M"       , "0F AE /7"                         , "ANY VOLATILE CLFLUSH"],

@@ -65,21 +65,6 @@ function buildCpuRegs(defs) {
 // ============================================================================
 
 const kCpuRegisters = buildCpuRegs(x86data.registers);
-const kCpuFlags = {
-  "OF": true, // Overflow flag.
-  "SF": true, // Sign flag.
-  "ZF": true, // Zero flag.
-  "AF": true, // Adjust flag.
-  "PF": true, // Parity flag.
-  "CF": true, // Carry flag.
-  "DF": true, // Direction flag.
-  "IF": true, // Interrupt flag.
-  "AC": true, // Alignment check.
-  "C0": true, // FPU's C0 flag.
-  "C1": true, // FPU's C1 flag.
-  "C2": true, // FPU's C2 flag.
-  "C3": true  // FPU's C3 flag.
-};
 
 // ============================================================================
 // [asmdb.x86.Utils]
@@ -342,8 +327,8 @@ class Instruction extends BaseInstruction {
 
     this.kmask = false;        // AVX-512 merging {k}.
     this.zmask = false;        // AVX-512 zeroing {kz}, implies {k}.
+    this.er = false;           // AVX-512 embedded rounding {er}, implies {sae}.
     this.sae = false;          // AVX-512 suppress all exceptions {sae} support.
-    this.rnd = false;          // AVX-512 embedded rounding {er}, implies {sae}.
 
     this.tupleType = "";       // AVX-512 tuple-type.
     this.elementSize = -1;     // Instruction's element size.
@@ -617,7 +602,7 @@ class Instruction extends BaseInstruction {
         return true;
 
       case "er":
-        this.rnd = true;
+        this.er = true;
         // fall: {er} implies {sae}.
       case "sae":
         this.sae = true;
@@ -663,6 +648,10 @@ class Instruction extends BaseInstruction {
     var immCount = this.getImmCount();
 
     var m;
+
+    // If the instruction reads or writes from/to MSR register it requires MSR extension.
+    if (this.attributes.MSR)
+      this.extensions.MSR = true;
 
     // Verify that the immediate operand/operands are specified in instruction
     // encoding and opcode field. Basically if there is an "ix" in operands,
