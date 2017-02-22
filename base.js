@@ -228,11 +228,12 @@ class BaseInstruction {
       return true;
     }
 
-    if (db.specialRegs[key]) {
+    const specialRegDef = db.specialRegs[key];
+    if (specialRegDef) {
       if (typeof value !== "string" || !/^[RWXU01]$/.test(value))
-        this.report(`Special registers must contain 'R|W|X|U|0|1', not ${value}`);
+        this.report(`Special register must specify 'R|W|X|U|0|1', not ${value}`);
 
-      this.specialRegs[key] = value;
+      this.specialRegs[specialRegDef.name] = value;
       return true;
     }
 
@@ -453,8 +454,9 @@ class BaseISA {
       const name = item.name;
 
       const obj = {
-        name: name,
-        doc : item.doc || ""
+        name : name,
+        group: item.group || name,
+        doc  : item.doc || ""
       };
 
       this._specialRegs[name] = obj;
@@ -468,13 +470,18 @@ class BaseISA {
     for (var i = 0; i < items.length; i++) {
       const item = items[i];
       const name = item.name;
+      const expand = item.expand;
+
+      if (!name || !expand)
+        fail("Shortcut must contain 'name' and 'expand' properties");
 
       const obj = {
-        name: name,
-        doc : item.doc || ""
+        name  : name,
+        expand: expand,
+        doc   : item.doc || ""
       };
 
-      this._specialRegs[name] = obj;
+      this._shortcuts[name] = obj;
     }
   }
 
