@@ -179,10 +179,10 @@ class BaseInstruction {
 
         for (var i = 0; i < keys.length; i++)
           this._assignAttribute(base + keys[i], val);
-        return;
       }
-
-      this._assignAttribute(key, val);
+      else {
+        this._assignAttribute(key, val);
+      }
     }
   }
 
@@ -199,13 +199,10 @@ class BaseInstruction {
   _assignSimpleAttribute(key, value) {
     const db = this.db;
 
-    const extensionDef = db.extensions[key];
-    if (extensionDef) {
-      this.extensions[key] = true;
-      return true;
-    }
-
     const attributeDef = db.attributes[key];
+    const specialRegDef = db.specialRegs[key];
+    const extensionDef = db.extensions[key];
+
     if (attributeDef) {
       switch (attributeDef.type) {
         case "flag":
@@ -228,16 +225,23 @@ class BaseInstruction {
       return true;
     }
 
-    const specialRegDef = db.specialRegs[key];
+    // Probe both `specialRegs` and `extension` as they may specify the same thing.
+    var result = false;
+
     if (specialRegDef) {
       if (typeof value !== "string" || !/^[RWXU01]$/.test(value))
         this.report(`Special register must specify 'R|W|X|U|0|1', not ${value}`);
 
       this.specialRegs[specialRegDef.name] = value;
-      return true;
+      result = true;
     }
 
-    return false;
+    if (extensionDef) {
+      this.extensions[key] = true;
+      result = true;
+    }
+
+    return result;
   }
 
   _assignSpecificAttribute(key, value) {

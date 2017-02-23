@@ -57,6 +57,12 @@ function buildCpuRegs(defs) {
     }
   }
 
+  // HACK: In instruction manuals `r8` denotes low 8-bit register, however,
+  // that collides with `r8`, which is a 64-bit register. Since the result
+  // of this function is only used internally we patch it to be compatible
+  // with what Intel specifies.
+  map.r8.type = "r8";
+
   return map;
 }
 
@@ -164,9 +170,9 @@ class Operand extends BaseOperand {
       this.setAccess(mAccess[1]);
 
       // RWX[A:B]:
-      if (mAccess.length > 2) {
-        var a = parseInt(mAccess[2], 10);
-        var b = parseInt(mAccess[3], 10);
+      if (mAccess[2] !== undefined) {
+        var a = parseInt(mAccess[3], 10);
+        var b = parseInt(mAccess[4], 10);
 
         this.rwxIndex = Math.min(a, b);
         this.rwxWidth = Math.abs(a - b) + 1;
@@ -272,6 +278,10 @@ class Operand extends BaseOperand {
   isMem() { return !!this.mem; }
   isImm() { return !!this.imm; }
   isRel() { return !!this.rel; }
+
+  isFixedReg() { return this.reg && this.reg !== this.regType && this.reg !== "st(i)"; }
+  isFixedMem() { return this.memSeg && this.isFixedReg(); }
+
   isRegOrMem() { return !!this.reg || !!this.mem; }
   isRegAndMem() { return !!this.reg && !!this.mem; }
 
@@ -648,10 +658,6 @@ class Instruction extends BaseInstruction {
     var immCount = this.getImmCount();
 
     var m;
-
-    // If the instruction reads or writes from/to MSR register it requires MSR extension.
-    if (this.attributes.MSR)
-      this.extensions.MSR = true;
 
     // Verify that the immediate operand/operands are specified in instruction
     // encoding and opcode field. Basically if there is an "ix" in operands,
