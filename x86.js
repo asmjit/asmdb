@@ -95,7 +95,7 @@ class Utils {
   // Get whether the string `s` describes a memory operand.
   static isMemOp(s) { return s && /^(?:mem|mib|(?:m(?:off)?\d+(?:dec|bcd|fp|int)?)|(?:vm\d+(?:x|y|z)))$/.test(s); }
   // Get whether the string `s` describes an immediate operand.
-  static isImmOp(s) { return s && /^(?:1|i4|ib|iw|id|iq)$/.test(s); }
+  static isImmOp(s) { return s && /^(?:1|u4|ib|ub|iw|uw|id|ud|iq|uq)$/.test(s); }
   // Get whether the string `s` describes a relative displacement (label).
   static isRelOp(s) { return s && /^rel\d+$/.test(s); }
 
@@ -112,11 +112,11 @@ class Utils {
   // Handles "ib", "iw", "id", "iq", and also "/is4".
   static immSize(s) {
     if (s === "1" ) return 8;
-    if (s === "i4" || s === "/is4") return 4;
-    if (s === "ib") return 8;
-    if (s === "iw") return 16;
-    if (s === "id") return 32;
-    if (s === "iq") return 64;
+    if (s === "i4" || s === "u4" || s === "/is4") return 4;
+    if (s === "ib" || s === "ub") return 8;
+    if (s === "iw" || s === "uw") return 16;
+    if (s === "id" || s === "ud") return 32;
+    if (s === "iq" || s === "uq") return 64;
 
     return -1;
   }
@@ -154,7 +154,9 @@ class Operand extends BaseOperand {
     this.bcstSize = -1;        // AVX-512 broadcast size.
 
     this.imm = 0;              // Immediate operand's size.
+    this.immSign = "";         // Immediate sign (any / signed / unsigned).
     this.immValue = null;      // Immediate value - `null` or `1` (only used by shift/rotate instructions).
+
     this.rel = 0;              // Relative displacement operand's size.
 
     this.rwxIndex = -1;        // Read/Write (RWX) index.
@@ -199,7 +201,7 @@ class Operand extends BaseOperand {
       s = s.substring(1, s.length - 1);
     }
 
-    // Support multiple operands separated by "/" (only used by r/m style definition).
+    // Support multiple operands separated by "/" (only used by r/m and i/u).
     var ops = s.split("/");
     for (var i = 0; i < ops.length; i++) {
       var op = ops[i].trim();
@@ -239,13 +241,27 @@ class Operand extends BaseOperand {
       }
 
       if (Utils.isImmOp(op)) {
-        this.imm = Utils.immSize(op);
+        const size = Utils.immSize(op);
+        if (!this.imm)
+          this.imm = size;
+        else if (this.imm !== size)
+          fail(`Immediate size mismatch: ${this.imm} != ${size}`);
+
+        // Sign-extend / zero-extend.
+        const sign = op.startsWith("i") ? "signed" : "unsigned";
+
+        if (!this.immSign)
+          this.immSign = sign;
+        else if (this.immType !== sign)
+          this.immSign = "any";
+
         if (op === "1") {
-          this.implicit = true;
           this.immValue = 1;
+          this.implicit = true;
         }
 
-        type.push("imm");
+        if (type.indexOf("imm") !== -1)
+          type.push("imm");
         continue;
       }
 
@@ -256,7 +272,7 @@ class Operand extends BaseOperand {
         continue;
       }
 
-      throw Error(`asmdb.x86.Operand(): Unhandled operand '${op}'`);
+      fail(`Unhandled operand '${op}'`);
     }
 
     // In case the data has been modified it's always better to use the stripped off
