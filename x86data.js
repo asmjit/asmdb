@@ -1109,8 +1109,8 @@ $export[$as] =
     ["rdseed"           , "W:r32"                                    , "M"       , "0F C7 /7"                         , "ANY VOLATILE RDSEED OF=0 SF=0 ZF=0 AF=0 PF=0 CF=W"],
     ["rdseed"           , "W:r64"                                    , "M"       , "REX.W 0F C7 /7"                   , "X64 VOLATILE RDSEED OF=0 SF=0 ZF=0 AF=0 PF=0 CF=W"],
 
-    ["xgetbv"           , "R:<ecx>, W:<edx>, W:<eax>"                , "NONE"    , "0F 01 D0"                         , "ANY VOLATILE XSAVE XCR=R"],
-    ["xsetbv"           , "R:<ecx>, R:<edx>, R:<eax>"                , "NONE"    , "0F 01 D1"                         , "ANY VOLATILE XSAVE XCR=W PRIVILEGE=L0"],
+    ["xgetbv"           , "W:<edx>, W:<eax>, R:<ecx>"                , "NONE"    , "0F 01 D0"                         , "ANY VOLATILE XSAVE XCR=R"],
+    ["xsetbv"           , "R:<edx>, R:<eax>, R:<ecx>"                , "NONE"    , "0F 01 D1"                         , "ANY VOLATILE XSAVE XCR=W PRIVILEGE=L0"],
 
     ["xrstor"           , "R:mem, <edx>, <eax>"                      , "M"       , "0F AE /5"                         , "ANY VOLATILE XSAVE XCR=R"],
     ["xrstor64"         , "R:mem, <edx>, <eax>"                      , "M"       , "REX.W 0F AE /5"                   , "X64 VOLATILE XSAVE XCR=R"],
