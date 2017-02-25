@@ -165,8 +165,7 @@ $export[$as] =
   "attributes": [
     { "name": "LOCK"             , "type": "flag"        , "doc": "Can be used with LOCK prefix." },
     { "name": "IMPLICIT_LOCK"    , "type": "flag"        , "doc": "Instruction is always atomic, regardless of use of the LOCK prefix." },
-    { "name": "REP"              , "type": "flag"        , "doc": "Can be used with REP prefix." },
-    { "name": "REPZ"             , "type": "flag"        , "doc": "Can be used with REPE/REPZ prefix." },
+    { "name": "REP"              , "type": "flag"        , "doc": "Can be used with REP/REPE/REPZ prefix." },
     { "name": "REPNZ"            , "type": "flag"        , "doc": "Can be used with REPNE/REPNZ prefix." },
     { "name": "PUSH"             , "type": "flag"        , "doc": "Instruction pushes onto the stack." },
     { "name": "POP"              , "type": "flag"        , "doc": "Instruction pops from stack." },
@@ -476,10 +475,10 @@ $export[$as] =
     ["cmp"              , "R:r32, r32/m32"                           , "RM"      , "3B /r"                            , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
     ["cmp"              , "R:r64, r64/m64"                           , "RM"      , "REX.W 3B /r"                      , "X64 OF=W SF=W ZF=W AF=W PF=W CF=W"],
 
-    ["cmpsb"            , "X:<ds:zsi>, X:<es:zdi>"                   , "NONE"    , "A6"                               , "ANY REPZ REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
-    ["cmpsw"            , "X:<ds:zsi>, X:<es:zdi>"                   , "NONE"    , "66 A7"                            , "ANY REPZ REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
-    ["cmpsd"            , "X:<ds:zsi>, X:<es:zdi>"                   , "NONE"    , "A7"                               , "ANY REPZ REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
-    ["cmpsq"            , "X:<ds:zsi>, X:<es:zdi>"                   , "NONE"    , "REX.W A7"                         , "X64 REPZ REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
+    ["cmpsb"            , "X:<ds:zsi>, X:<es:zdi>"                   , "NONE"    , "A6"                               , "ANY REP REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
+    ["cmpsw"            , "X:<ds:zsi>, X:<es:zdi>"                   , "NONE"    , "66 A7"                            , "ANY REP REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
+    ["cmpsd"            , "X:<ds:zsi>, X:<es:zdi>"                   , "NONE"    , "A7"                               , "ANY REP REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
+    ["cmpsq"            , "X:<ds:zsi>, X:<es:zdi>"                   , "NONE"    , "REX.W A7"                         , "X64 REP REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
 
     ["cmpxchg"          , "r8/m8, r8, <al>"                          , "MR"      , "0F B0 /r"                         , "ANY I486 LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
     ["cmpxchg"          , "r16/m16, r16, <ax>"                       , "MR"      , "66 0F B1 /r"                      , "ANY I486 LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
@@ -540,9 +539,9 @@ $export[$as] =
     ["in"               , "W:al, dx"                                 , "NONE"    , "EC"                               , "ANY VOLATILE"],
     ["in"               , "W:ax, dx"                                 , "NONE"    , "66 ED"                            , "ANY VOLATILE"],
     ["in"               , "W:eax, dx"                                , "NONE"    , "ED"                               , "ANY VOLATILE"],
-    ["insb"             , "W:es:zdi, dx"                             , "NONE"    , "6C"                               , "ANY VOLATILE REP"],
-    ["insw"             , "W:es:zdi, dx"                             , "NONE"    , "66 6D"                            , "ANY VOLATILE REP"],
-    ["insd"             , "W:es:zdi, dx"                             , "NONE"    , "6D"                               , "ANY VOLATILE REP"],
+    ["insb"             , "W:es:zdi, dx"                             , "NONE"    , "6C"                               , "ANY VOLATILE REP REPNZ"],
+    ["insw"             , "W:es:zdi, dx"                             , "NONE"    , "66 6D"                            , "ANY VOLATILE REP REPNZ"],
+    ["insd"             , "W:es:zdi, dx"                             , "NONE"    , "6D"                               , "ANY VOLATILE REP REPNZ"],
 
     ["int"              , "ub"                                       , "I"       , "CD ib"                            , "ANY VOLATILE"],
     ["int3"             , ""                                         , "NONE"    , "CC"                               , "ANY VOLATILE"],
@@ -600,10 +599,10 @@ $export[$as] =
 
     ["leave"            , ""                                         , "NONE"    , "C9"                               , "ANY VOLATILE POP"],
 
-    ["lodsb"            , "W:<al>, X:<ds:zsi>"                       , "NONE"    , "AC"                               , "ANY REP DF=R"],
-    ["lodsw"            , "W:<ax>, X:<ds:zsi>"                       , "NONE"    , "66 AD"                            , "ANY REP DF=R"],
-    ["lodsd"            , "W:<eax>, X:<ds:zsi>"                      , "NONE"    , "AD"                               , "ANY REP DF=R"],
-    ["lodsq"            , "W:<rax>, X:<ds:zsi>"                      , "NONE"    , "REX.W AD"                         , "X64 REP DF=R"],
+    ["lodsb"            , "W:<al>, X:<ds:zsi>"                       , "NONE"    , "AC"                               , "ANY REP REPNZ DF=R"],
+    ["lodsw"            , "W:<ax>, X:<ds:zsi>"                       , "NONE"    , "66 AD"                            , "ANY REP REPNZ DF=R"],
+    ["lodsd"            , "W:<eax>, X:<ds:zsi>"                      , "NONE"    , "AD"                               , "ANY REP REPNZ DF=R"],
+    ["lodsq"            , "W:<rax>, X:<ds:zsi>"                      , "NONE"    , "REX.W AD"                         , "X64 REP REPNZ DF=R"],
 
     ["loop"             , "X:<cx>, rel8"                             , "D"       , "67 E2 cb"                         , "X86 VOLATILE"],
     ["loop"             , "X:<ecx>, rel8"                            , "D"       , "E2 cb"                            , "X86 VOLATILE"],
@@ -667,10 +666,10 @@ $export[$as] =
     ["mov"              , "W:dreg, r32"                              , "RM"      , "0F 23 /r"                         , "X86 OF=U SF=U ZF=U AF=U PF=U CF=U"],
     ["mov"              , "W:dreg, r64"                              , "RM"      , "0F 23 /r"                         , "X64 OF=U SF=U ZF=U AF=U PF=U CF=U"],
 
-    ["movsb"            , "X:<es:zdi>, X:<ds:zsi>"                   , "NONE"    , "A4"                               , "ANY REP DF=R"],
-    ["movsw"            , "X:<es:zdi>, X:<ds:zsi>"                   , "NONE"    , "66 A5"                            , "ANY REP DF=R"],
-    ["movsd"            , "X:<es:zdi>, X:<ds:zsi>"                   , "NONE"    , "A5"                               , "ANY REP DF=R"],
-    ["movsq"            , "X:<es:zdi>, X:<ds:zsi>"                   , "NONE"    , "REX.W A5"                         , "X64 REP DF=R"],
+    ["movsb"            , "X:<es:zdi>, X:<ds:zsi>"                   , "NONE"    , "A4"                               , "ANY REP REPNZ DF=R"],
+    ["movsw"            , "X:<es:zdi>, X:<ds:zsi>"                   , "NONE"    , "66 A5"                            , "ANY REP REPNZ DF=R"],
+    ["movsd"            , "X:<es:zdi>, X:<ds:zsi>"                   , "NONE"    , "A5"                               , "ANY REP REPNZ DF=R"],
+    ["movsq"            , "X:<es:zdi>, X:<ds:zsi>"                   , "NONE"    , "REX.W A5"                         , "X64 REP REPNZ DF=R"],
 
     ["movsx"            , "W:r16, r8/m8"                             , "RM"      , "66 0F BE /r"                      , "ANY"],
     ["movsx"            , "W:r32, r8/m8"                             , "RM"      , "0F BE /r"                         , "ANY"],
@@ -734,9 +733,9 @@ $export[$as] =
     ["out"              , "R:dx, R:al"                               , "NONE"    , "EE"                               , "ANY VOLATILE"],
     ["out"              , "R:dx, R:ax"                               , "NONE"    , "66 EF"                            , "ANY VOLATILE"],
     ["out"              , "R:dx, R:eax"                              , "NONE"    , "EF"                               , "ANY VOLATILE"],
-    ["outsb"            , "R:dx, R:ds:zsi"                           , "NONE"    , "6E"                               , "ANY VOLATILE REP"],
-    ["outsw"            , "R:dx, R:ds:zsi"                           , "NONE"    , "66 6F"                            , "ANY VOLATILE REP"],
-    ["outsd"            , "R:dx, R:ds:zsi"                           , "NONE"    , "6F"                               , "ANY VOLATILE REP"],
+    ["outsb"            , "R:dx, R:ds:zsi"                           , "NONE"    , "6E"                               , "ANY VOLATILE REP REPNZ"],
+    ["outsw"            , "R:dx, R:ds:zsi"                           , "NONE"    , "66 6F"                            , "ANY VOLATILE REP REPNZ"],
+    ["outsd"            , "R:dx, R:ds:zsi"                           , "NONE"    , "6F"                               , "ANY VOLATILE REP REPNZ"],
 
     ["pause"            , ""                                         , "NONE"    , "F3 90"                            , "ANY VOLATILE"],
 
@@ -926,10 +925,10 @@ $export[$as] =
     ["sbb"              , "r32, r32/m32"                             , "RM"      , "1B /r"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
     ["sbb"              , "r64, r64/m64"                             , "RM"      , "REX.W 1B /r"                      , "X64 LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
 
-    ["scasb"            , "R:<al>, X:<es:zdi>"                       , "NONE"    , "AE"                               , "ANY REPZ REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
-    ["scasw"            , "R:<ax>, X:<es:zdi>"                       , "NONE"    , "66 AF"                            , "ANY REPZ REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
-    ["scasd"            , "R:<eax>, X:<es:zdi>"                      , "NONE"    , "AF"                               , "ANY REPZ REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
-    ["scasq"            , "R:<rax>, X:<es:zdi>"                      , "NONE"    , "REX.W AF"                         , "X64 REPZ REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
+    ["scasb"            , "R:<al>, X:<es:zdi>"                       , "NONE"    , "AE"                               , "ANY REP REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
+    ["scasw"            , "R:<ax>, X:<es:zdi>"                       , "NONE"    , "66 AF"                            , "ANY REP REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
+    ["scasd"            , "R:<eax>, X:<es:zdi>"                      , "NONE"    , "AF"                               , "ANY REP REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
+    ["scasq"            , "R:<rax>, X:<es:zdi>"                      , "NONE"    , "REX.W AF"                         , "X64 REP REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
 
     ["seto"             , "W:r8/m8"                                  , "M"       , "0F 90 /r"                         , "ANY OF=R"],
     ["setno"            , "W:r8/m8"                                  , "M"       , "0F 91 /r"                         , "ANY OF=R"],
@@ -967,10 +966,10 @@ $export[$as] =
     ["std"              , ""                                         , "NONE"    , "FD"                               , "ANY DF=1"],
     ["sti"              , ""                                         , "NONE"    , "FB"                               , "ANY VOLATILE IF=1"],
 
-    ["stosb"            , "X:<es:zdi>, R:<al>"                       , "NONE"    , "AA"                               , "ANY REP DF=R"],
-    ["stosw"            , "X:<es:zdi>, R:<ax>"                       , "NONE"    , "66 AB"                            , "ANY REP DF=R"],
-    ["stosd"            , "X:<es:zdi>, R:<eax>"                      , "NONE"    , "AB"                               , "ANY REP DF=R"],
-    ["stosq"            , "X:<es:zdi>, R:<rax>"                      , "NONE"    , "REX.W AB"                         , "X64 REP DF=R"],
+    ["stosb"            , "X:<es:zdi>, R:<al>"                       , "NONE"    , "AA"                               , "ANY REP REPNZ DF=R"],
+    ["stosw"            , "X:<es:zdi>, R:<ax>"                       , "NONE"    , "66 AB"                            , "ANY REP REPNZ DF=R"],
+    ["stosd"            , "X:<es:zdi>, R:<eax>"                      , "NONE"    , "AB"                               , "ANY REP REPNZ DF=R"],
+    ["stosq"            , "X:<es:zdi>, R:<rax>"                      , "NONE"    , "REX.W AB"                         , "X64 REP REPNZ DF=R"],
 
     ["sub"              , "al, ib/ub"                                , "I"       , "2C ib"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
     ["sub"              , "ax, iw/uw"                                , "I"       , "66 2D iw"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
