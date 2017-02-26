@@ -93,7 +93,7 @@ class Utils {
   // Get whether the string `s` describes a register operand.
   static isRegOp(s) { return s && hasOwn.call(kCpuRegisters, s); }
   // Get whether the string `s` describes a memory operand.
-  static isMemOp(s) { return s && /^(?:mem|mib|(?:m(?:off)?\d+(?:dec|bcd|fp|int)?)|(?:vm\d+(?:x|y|z)))$/.test(s); }
+  static isMemOp(s) { return s && /^(?:mem|mib|(?:m(?:off)?\d+(?:dec|bcd|fp|int)?)|(?:m16_\d+)|(?:vm\d+(?:x|y|z)))$/.test(s); }
   // Get whether the string `s` describes an immediate operand.
   static isImmOp(s) { return s && /^(?:1|u4|ib|ub|iw|uw|id|ud|iq|uq)$/.test(s); }
   // Get whether the string `s` describes a relative displacement (label).
@@ -126,6 +126,7 @@ class Utils {
   // Handles "rel8" and "rel32".
   static relSize(s) {
     if (s === "rel8") return 8;
+    if (s === "rel16") return 16;
     if (s === "rel32") return 32;
 
     return -1;
@@ -149,6 +150,7 @@ class Operand extends BaseOperand {
     this.memSize = -1;         // Memory operand's size.
     this.memOff = false;       // Memory operand is an absolute offset (only a specific version of MOV).
     this.memSeg = "";          // Segment specified with register that is used to perform a memory IO.
+    this.memFar = false;       // Memory is a far pointer (includes segment in first two bytes).
     this.vsibReg = "";         // AVX VSIB register type (xmm/ymm/zmm).
     this.vsibSize = -1;        // AVX VSIB register size (32/64).
     this.bcstSize = -1;        // AVX-512 broadcast size.
@@ -228,6 +230,12 @@ class Operand extends BaseOperand {
         const mOff = /^m(?:off)?(\d+)/.exec(op);
         this.memSize = mOff ? parseInt(mOff[1], 10) : 0;
         this.memOff = op.indexOf("moff") === 0;
+
+        const mSeg = /^m16_(\d+)/.exec(op);
+        if (mSeg) {
+          this.memFar = true;
+          this.memSize = parseInt(mSeg[1], 10) + 16;
+        }
 
         // Handle vector addressing mode and size "vmXXr".
         const mVM = /^vm(\d+)(x|y|z)$/.exec(op);
@@ -572,8 +580,9 @@ class Instruction extends BaseInstruction {
         }
 
         // Parse displacement.
-        if (/^(?:cb|cd)$/.test(comp) && !this.rel) {
-          this.rel = comp === "cb" ? 1 : 4;
+        if (/^(?:cb|cw|cd)$/.test(comp) && !this.rel) {
+          this.rel = comp === "cb" ? 1 :
+                     comp === "cw" ? 2 : 4;
           continue;
         }
 

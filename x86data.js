@@ -69,18 +69,8 @@
 // [ ] call (far)
 // [ ] jmp (far)
 // [ ] ret (far)
-// [ ] iret/iretd
-// [ ] lds/les/lfs/lgs/lss
-// [ ] rsm
-// [ ] xacquire (prefix)
-// [ ] xrelease (prefix)
-// [ ] xabort
-// [ ] xbegin
-// [ ] xend
 // [ ] xlat/xlatb
-// [ ] xtest
-// [ ] VMX/SVM extensions
-// [ ] TSX extensions
+// [ ] VMX/SVM/SMX extensions
 
 (function($export, $as) {
 "use strict";
@@ -128,6 +118,7 @@ $export[$as] =
     { "name": "FSGSBASE"         },
     { "name": "FXSR"             },
     { "name": "GEODE"            },
+    { "name": "HLE"              },
     { "name": "I486"             },
     { "name": "LAHFSAHF"         },
     { "name": "LZCNT"            },
@@ -146,6 +137,7 @@ $export[$as] =
     { "name": "RDSEED"           },
     { "name": "RDTSC"            },
     { "name": "RDTSCP"           },
+    { "name": "RTM"              },
     { "name": "SHA"              },
     { "name": "SMAP"             },
     { "name": "SSE"              },
@@ -156,6 +148,7 @@ $export[$as] =
     { "name": "SSE4A"            },
     { "name": "SSSE3"            },
     { "name": "TBM"              },
+    { "name": "TSX"              },
     { "name": "VMX"              },
     { "name": "XOP"              },
     { "name": "XSAVE"            },
@@ -169,7 +162,9 @@ $export[$as] =
     { "name": "REPNZ"            , "type": "flag"        , "doc": "Can be used with REPNE/REPNZ prefix." },
     { "name": "PUSH"             , "type": "flag"        , "doc": "Instruction pushes onto the stack." },
     { "name": "POP"              , "type": "flag"        , "doc": "Instruction pops from stack." },
-    { "name": "VOLATILE"         , "type": "flag"        , "doc": "Instruction has side effects (hint for scheduler)." }
+    { "name": "VOLATILE"         , "type": "flag"        , "doc": "Instruction has side effects (hint for scheduler)." },
+    { "name": "XACQUIRE"         , "type": "flag"        , "doc": "A hint used to start lock elision on the instruction memory operand address." },
+    { "name": "XRELEASE"         , "type": "flag"        , "doc": "A hint used to end lock elision on the instruction memory operand address." }
   ],
 
   "specialRegs": [
@@ -259,79 +254,91 @@ $export[$as] =
     ["aad"              , "<ax>, ub"                                 , "I"       , "D5 ib"                            , "X86 OF=U SF=W ZF=W AF=U PF=W CF=U"],
     ["aam"              , "<ax>, ub"                                 , "I"       , "D4 ib"                            , "X86 OF=U SF=W ZF=W AF=U PF=W CF=U"],
 
-    ["adc"              , "al, ib/ub"                                , "I"       , "14 ib"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["adc"              , "ax, iw/uw"                                , "I"       , "66 15 iw"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["adc"              , "eax, id/ud"                               , "I"       , "15 id"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["adc"              , "rax, id"                                  , "I"       , "REX.W 15 id"                      , "X64 LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["adc"              , "al, ib/ub"                                , "I"       , "14 ib"                            , "ANY OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["adc"              , "ax, iw/uw"                                , "I"       , "66 15 iw"                         , "ANY OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["adc"              , "eax, id/ud"                               , "I"       , "15 id"                            , "ANY OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["adc"              , "rax, id"                                  , "I"       , "REX.W 15 id"                      , "X64 OF=W SF=W ZF=W AF=W PF=W CF=X"],
 
-    ["adc"              , "r8/m8, ib/ub"                             , "MI"      , "80 /2 ib"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["adc"              , "r16/m16, iw/uw"                           , "MI"      , "66 81 /2 iw"                      , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["adc"              , "r32/m32, id/ud"                           , "MI"      , "81 /2 id"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["adc"              , "r64/m64, id"                              , "MI"      , "REX.W 81 /2 id"                   , "X64 LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["adc"              , "r8/m8, ib/ub"                             , "MI"      , "80 /2 ib"                         , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["adc"              , "r16/m16, iw/uw"                           , "MI"      , "66 81 /2 iw"                      , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["adc"              , "r32/m32, id/ud"                           , "MI"      , "81 /2 id"                         , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["adc"              , "r64/m64, id"                              , "MI"      , "REX.W 81 /2 id"                   , "X64 LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=X"],
 
-    ["adc"              , "r16/m16, ib"                              , "MI"      , "66 83 /2 ib"                      , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["adc"              , "r32/m32, ib"                              , "MI"      , "83 /2 ib"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["adc"              , "r64/m64, ib"                              , "MI"      , "REX.W 83 /2 ib"                   , "X64 LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["adc"              , "r16/m16, ib"                              , "MI"      , "66 83 /2 ib"                      , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["adc"              , "r32/m32, ib"                              , "MI"      , "83 /2 ib"                         , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["adc"              , "r64/m64, ib"                              , "MI"      , "REX.W 83 /2 ib"                   , "X64 LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=X"],
 
-    ["adc"              , "r8/m8, r8"                                , "MR"      , "10 /r"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["adc"              , "r16/m16, r16"                             , "MR"      , "66 11 /r"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["adc"              , "r32/m32, r32"                             , "MR"      , "11 /r"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["adc"              , "r64/m64, r64"                             , "MR"      , "REX.W 11 /r"                      , "X64 LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["adc"              , "r8/m8, r8"                                , "MR"      , "10 /r"                            , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["adc"              , "r16/m16, r16"                             , "MR"      , "66 11 /r"                         , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["adc"              , "r32/m32, r32"                             , "MR"      , "11 /r"                            , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["adc"              , "r64/m64, r64"                             , "MR"      , "REX.W 11 /r"                      , "X64 LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=X"],
 
-    ["adc"              , "r8, r8/m8"                                , "RM"      , "12 /r"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["adc"              , "r16, r16/m16"                             , "RM"      , "66 13 /r"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["adc"              , "r32, r32/m32"                             , "RM"      , "13 /r"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["adc"              , "r64, r64/m64"                             , "RM"      , "REX.W 13 /r"                      , "X64 LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["adc"              , "r8, r8/m8"                                , "RM"      , "12 /r"                            , "ANY OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["adc"              , "r16, r16/m16"                             , "RM"      , "66 13 /r"                         , "ANY OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["adc"              , "r32, r32/m32"                             , "RM"      , "13 /r"                            , "ANY OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["adc"              , "r64, r64/m64"                             , "RM"      , "REX.W 13 /r"                      , "X64 OF=W SF=W ZF=W AF=W PF=W CF=X"],
 
-    ["add"              , "al, ib/ub"                                , "I"       , "04 ib"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["add"              , "ax, iw/uw"                                , "I"       , "66 05 iw"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["add"              , "eax, id/ud"                               , "I"       , "05 id"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["add"              , "rax, id"                                  , "I"       , "REX.W 05 id"                      , "X64 LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["add"              , "al, ib/ub"                                , "I"       , "04 ib"                            , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["add"              , "ax, iw/uw"                                , "I"       , "66 05 iw"                         , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["add"              , "eax, id/ud"                               , "I"       , "05 id"                            , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["add"              , "rax, id"                                  , "I"       , "REX.W 05 id"                      , "X64 OF=W SF=W ZF=W AF=W PF=W CF=W"],
 
-    ["add"              , "r8/m8, ib/ub"                             , "MI"      , "80 /0 ib"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["add"              , "r16/m16, iw/uw"                           , "MI"      , "66 81 /0 iw"                      , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["add"              , "r32/m32, id/ud"                           , "MI"      , "81 /0 id"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["add"              , "r64/m64, id"                              , "MI"      , "REX.W 81 /0 id"                   , "X64 LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["add"              , "r8/m8, ib/ub"                             , "MI"      , "80 /0 ib"                         , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["add"              , "r16/m16, iw/uw"                           , "MI"      , "66 81 /0 iw"                      , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["add"              , "r32/m32, id/ud"                           , "MI"      , "81 /0 id"                         , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["add"              , "r64/m64, id"                              , "MI"      , "REX.W 81 /0 id"                   , "X64 LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
 
-    ["add"              , "r16/m16, ib"                              , "MI"      , "66 83 /0 ib"                      , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["add"              , "r32/m32, ib"                              , "MI"      , "83 /0 ib"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["add"              , "r64/m64, ib"                              , "MI"      , "REX.W 83 /0 ib"                   , "X64 LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["add"              , "r16/m16, ib"                              , "MI"      , "66 83 /0 ib"                      , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["add"              , "r32/m32, ib"                              , "MI"      , "83 /0 ib"                         , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["add"              , "r64/m64, ib"                              , "MI"      , "REX.W 83 /0 ib"                   , "X64 LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
 
-    ["add"              , "r8/m8, r8"                                , "MR"      , "00 /r"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["add"              , "r16/m16, r16"                             , "MR"      , "66 01 /r"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["add"              , "r32/m32, r32"                             , "MR"      , "01 /r"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["add"              , "r64/m64, r64"                             , "MR"      , "REX.W 01 /r"                      , "X64 LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["add"              , "r8/m8, r8"                                , "MR"      , "00 /r"                            , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["add"              , "r16/m16, r16"                             , "MR"      , "66 01 /r"                         , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["add"              , "r32/m32, r32"                             , "MR"      , "01 /r"                            , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["add"              , "r64/m64, r64"                             , "MR"      , "REX.W 01 /r"                      , "X64 LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
 
-    ["add"              , "r8, r8/m8"                                , "RM"      , "02 /r"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["add"              , "r16, r16/m16"                             , "RM"      , "66 03 /r"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["add"              , "r32, r32/m32"                             , "RM"      , "03 /r"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["add"              , "r64, r64/m64"                             , "RM"      , "REX.W 03 /r"                      , "X64 LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["add"              , "r8, r8/m8"                                , "RM"      , "02 /r"                            , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["add"              , "r16, r16/m16"                             , "RM"      , "66 03 /r"                         , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["add"              , "r32, r32/m32"                             , "RM"      , "03 /r"                            , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["add"              , "r64, r64/m64"                             , "RM"      , "REX.W 03 /r"                      , "X64 OF=W SF=W ZF=W AF=W PF=W CF=W"],
 
-    ["and"              , "al, ib/ub"                                , "I"       , "24 ib"                            , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["and"              , "ax, iw/uw"                                , "I"       , "66 25 iw"                         , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["and"              , "eax, id/ud"                               , "I"       , "25 id"                            , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["and"              , "rax, id"                                  , "I"       , "REX.W 25 id"                      , "X64 LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["and"              , "al, ib/ub"                                , "I"       , "24 ib"                            , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["and"              , "ax, iw/uw"                                , "I"       , "66 25 iw"                         , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["and"              , "eax, id/ud"                               , "I"       , "25 id"                            , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["and"              , "rax, id"                                  , "I"       , "REX.W 25 id"                      , "X64 OF=0 SF=W ZF=W AF=U PF=W CF=0"],
 
-    ["and"              , "r8/m8, ib/ub"                             , "MI"      , "80 /4 ib"                         , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["and"              , "r16/m16, iw/uw"                           , "MI"      , "66 81 /4 iw"                      , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["and"              , "r32/m32, id/ud"                           , "MI"      , "81 /4 id"                         , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["and"              , "r64/m64, id"                              , "MI"      , "REX.W 81 /4 id"                   , "X64 LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["and"              , "r8/m8, ib/ub"                             , "MI"      , "80 /4 ib"                         , "ANY LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["and"              , "r16/m16, iw/uw"                           , "MI"      , "66 81 /4 iw"                      , "ANY LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["and"              , "r32/m32, id/ud"                           , "MI"      , "81 /4 id"                         , "ANY LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["and"              , "r64/m64, id"                              , "MI"      , "REX.W 81 /4 id"                   , "X64 LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
 
-    ["and"              , "r16/m16, ib/ub"                           , "MI"      , "66 83 /4 ib"                      , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["and"              , "r32/m32, ib/ub"                           , "MI"      , "83 /4 ib"                         , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["and"              , "r64/m64, ib/ub"                           , "MI"      , "REX.W 83 /4 ib"                   , "X64 LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["and"              , "r16/m16, ib/ub"                           , "MI"      , "66 83 /4 ib"                      , "ANY LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["and"              , "r32/m32, ib/ub"                           , "MI"      , "83 /4 ib"                         , "ANY LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["and"              , "r64/m64, ib/ub"                           , "MI"      , "REX.W 83 /4 ib"                   , "X64 LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
 
-    ["and"              , "r8/m8, r8"                                , "MR"      , "20 /r"                            , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["and"              , "r16/m16, r16"                             , "MR"      , "66 21 /r"                         , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["and"              , "r32/m32, r32"                             , "MR"      , "21 /r"                            , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["and"              , "r64/m64, r64"                             , "MR"      , "REX.W 21 /r"                      , "X64 LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["and"              , "r8/m8, r8"                                , "MR"      , "20 /r"                            , "ANY LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["and"              , "r16/m16, r16"                             , "MR"      , "66 21 /r"                         , "ANY LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["and"              , "r32/m32, r32"                             , "MR"      , "21 /r"                            , "ANY LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["and"              , "r64/m64, r64"                             , "MR"      , "REX.W 21 /r"                      , "X64 LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
 
-    ["and"              , "r8, r8/m8"                                , "RM"      , "22 /r"                            , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["and"              , "r16, r16/m16"                             , "RM"      , "66 23 /r"                         , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["and"              , "r32, r32/m32"                             , "RM"      , "23 /r"                            , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["and"              , "r64, r64/m64"                             , "RM"      , "REX.W 23 /r"                      , "X64 LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["and"              , "r8, r8/m8"                                , "RM"      , "22 /r"                            , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["and"              , "r16, r16/m16"                             , "RM"      , "66 23 /r"                         , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["and"              , "r32, r32/m32"                             , "RM"      , "23 /r"                            , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["and"              , "r64, r64/m64"                             , "RM"      , "REX.W 23 /r"                      , "X64 OF=0 SF=W ZF=W AF=U PF=W CF=0"],
 
     ["arpl"             , "X:r16/m16, R:r16"                         , "MR"      , "63 /r"                            , "X86 ZF=W"],
+
+    ["bndcl"            , "R:bnd, r32/m32"                           , "RM"      , "F3 0F 1A /r"                      , "X86 MPX"],
+    ["bndcl"            , "R:bnd, r64/m64"                           , "RM"      , "F3 0F 1A /r"                      , "X64 MPX"],
+    ["bndcn"            , "R:bnd, r32/m32"                           , "RM"      , "F2 0F 1B /r"                      , "X86 MPX"],
+    ["bndcn"            , "R:bnd, r64/m64"                           , "RM"      , "F2 0F 1B /r"                      , "X64 MPX"],
+    ["bndcu"            , "R:bnd, r32/m32"                           , "RM"      , "F2 0F 1A /r"                      , "X86 MPX"],
+    ["bndcu"            , "R:bnd, r64/m64"                           , "RM"      , "F2 0F 1A /r"                      , "X64 MPX"],
+    ["bndldx"           , "W:bnd, mib"                               , "RM"      , "0F 1A /r"                         , "ANY MPX"],
+    ["bndmk"            , "W:bnd, mem"                               , "RM"      , "F3 0F 1B /r"                      , "ANY MPX"],
+    ["bndmov"           , "W:bnd, bnd/mem"                           , "RM"      , "66 0F 1A /r"                      , "ANY MPX"],
+    ["bndmov"           , "W:bnd/mem, bnd"                           , "MR"      , "66 0F 1B /r"                      , "ANY MPX"],
+    ["bndstx"           , "W:mib, bnd"                               , "MR"      , "0F 1B /r"                         , "ANY MPX"],
 
     ["bound"            , "R:r16, R:m32"                             , "RM"      , "66 62 /r"                         , "X86"],
     ["bound"            , "R:r32, R:m64"                             , "RM"      , "62 /r"                            , "X86"],
@@ -355,29 +362,29 @@ $export[$as] =
     ["bt"               , "R:r32/m32, ub"                            , "MI"      , "0F BA /4 ib"                      , "ANY OF=U SF=U AF=U PF=U CF=W"],
     ["bt"               , "R:r64/m64, ub"                            , "MI"      , "REX.W 0F BA /4 ib"                , "X64 OF=U SF=U AF=U PF=U CF=W"],
 
-    ["btc"              , "r16/m16, r16"                             , "MR"      , "66 0F BB /r"                      , "ANY LOCK OF=U SF=U AF=U PF=U CF=W"],
-    ["btc"              , "r32/m32, r32"                             , "MR"      , "0F BB /r"                         , "ANY LOCK OF=U SF=U AF=U PF=U CF=W"],
-    ["btc"              , "r64/m64, r64"                             , "MR"      , "REX.W 0F BB /r"                   , "X64 LOCK OF=U SF=U AF=U PF=U CF=W"],
+    ["btc"              , "r16/m16, r16"                             , "MR"      , "66 0F BB /r"                      , "ANY LOCK XACQUIRE XRELEASE OF=U SF=U AF=U PF=U CF=W"],
+    ["btc"              , "r32/m32, r32"                             , "MR"      , "0F BB /r"                         , "ANY LOCK XACQUIRE XRELEASE OF=U SF=U AF=U PF=U CF=W"],
+    ["btc"              , "r64/m64, r64"                             , "MR"      , "REX.W 0F BB /r"                   , "X64 LOCK XACQUIRE XRELEASE OF=U SF=U AF=U PF=U CF=W"],
 
-    ["btc"              , "r16/m16, ub"                              , "MI"      , "66 0F BA /7 ib"                   , "ANY LOCK OF=U SF=U AF=U PF=U CF=W"],
-    ["btc"              , "r32/m32, ub"                              , "MI"      , "0F BA /7 ib"                      , "ANY LOCK OF=U SF=U AF=U PF=U CF=W"],
-    ["btc"              , "r64/m64, ub"                              , "MI"      , "REX.W 0F BA /7 ib"                , "X64 LOCK OF=U SF=U AF=U PF=U CF=W"],
+    ["btc"              , "r16/m16, ub"                              , "MI"      , "66 0F BA /7 ib"                   , "ANY LOCK XACQUIRE XRELEASE OF=U SF=U AF=U PF=U CF=W"],
+    ["btc"              , "r32/m32, ub"                              , "MI"      , "0F BA /7 ib"                      , "ANY LOCK XACQUIRE XRELEASE OF=U SF=U AF=U PF=U CF=W"],
+    ["btc"              , "r64/m64, ub"                              , "MI"      , "REX.W 0F BA /7 ib"                , "X64 LOCK XACQUIRE XRELEASE OF=U SF=U AF=U PF=U CF=W"],
 
-    ["btr"              , "r16/m16, r16"                             , "MR"      , "66 0F B3 /r"                      , "ANY LOCK OF=U SF=U AF=U PF=U CF=W"],
-    ["btr"              , "r32/m32, r32"                             , "MR"      , "0F B3 /r"                         , "ANY LOCK OF=U SF=U AF=U PF=U CF=W"],
-    ["btr"              , "r64/m64, r64"                             , "MR"      , "REX.W 0F B3 /r"                   , "X64 LOCK OF=U SF=U AF=U PF=U CF=W"],
+    ["btr"              , "r16/m16, r16"                             , "MR"      , "66 0F B3 /r"                      , "ANY LOCK XACQUIRE XRELEASE OF=U SF=U AF=U PF=U CF=W"],
+    ["btr"              , "r32/m32, r32"                             , "MR"      , "0F B3 /r"                         , "ANY LOCK XACQUIRE XRELEASE OF=U SF=U AF=U PF=U CF=W"],
+    ["btr"              , "r64/m64, r64"                             , "MR"      , "REX.W 0F B3 /r"                   , "X64 LOCK XACQUIRE XRELEASE OF=U SF=U AF=U PF=U CF=W"],
 
-    ["btr"              , "r16/m16, ub"                              , "MI"      , "66 0F BA /6 ib"                   , "ANY LOCK OF=U SF=U AF=U PF=U CF=W"],
-    ["btr"              , "r32/m32, ub"                              , "MI"      , "0F BA /6 ib"                      , "ANY LOCK OF=U SF=U AF=U PF=U CF=W"],
-    ["btr"              , "r64/m64, ub"                              , "MI"      , "REX.W 0F BA /6 ib"                , "X64 LOCK OF=U SF=U AF=U PF=U CF=W"],
+    ["btr"              , "r16/m16, ub"                              , "MI"      , "66 0F BA /6 ib"                   , "ANY LOCK XACQUIRE XRELEASE OF=U SF=U AF=U PF=U CF=W"],
+    ["btr"              , "r32/m32, ub"                              , "MI"      , "0F BA /6 ib"                      , "ANY LOCK XACQUIRE XRELEASE OF=U SF=U AF=U PF=U CF=W"],
+    ["btr"              , "r64/m64, ub"                              , "MI"      , "REX.W 0F BA /6 ib"                , "X64 LOCK XACQUIRE XRELEASE OF=U SF=U AF=U PF=U CF=W"],
 
-    ["bts"              , "r16/m16, r16"                             , "MR"      , "66 0F AB /r"                      , "ANY LOCK OF=U SF=U AF=U PF=U CF=W"],
-    ["bts"              , "r32/m32, r32"                             , "MR"      , "0F AB /r"                         , "ANY LOCK OF=U SF=U AF=U PF=U CF=W"],
-    ["bts"              , "r64/m64, r64"                             , "MR"      , "REX.W 0F AB /r"                   , "X64 LOCK OF=U SF=U AF=U PF=U CF=W"],
+    ["bts"              , "r16/m16, r16"                             , "MR"      , "66 0F AB /r"                      , "ANY LOCK XACQUIRE XRELEASE OF=U SF=U AF=U PF=U CF=W"],
+    ["bts"              , "r32/m32, r32"                             , "MR"      , "0F AB /r"                         , "ANY LOCK XACQUIRE XRELEASE OF=U SF=U AF=U PF=U CF=W"],
+    ["bts"              , "r64/m64, r64"                             , "MR"      , "REX.W 0F AB /r"                   , "X64 LOCK XACQUIRE XRELEASE OF=U SF=U AF=U PF=U CF=W"],
 
-    ["bts"              , "r16/m16, ub"                              , "MI"      , "66 0F BA /5 ib"                   , "ANY LOCK OF=U SF=U AF=U PF=U CF=W"],
-    ["bts"              , "r32/m32, ub"                              , "MI"      , "0F BA /5 ib"                      , "ANY LOCK OF=U SF=U AF=U PF=U CF=W"],
-    ["bts"              , "r64/m64, ub"                              , "MI"      , "REX.W 0F BA /5 ib"                , "X64 LOCK OF=U SF=U AF=U PF=U CF=W"],
+    ["bts"              , "r16/m16, ub"                              , "MI"      , "66 0F BA /5 ib"                   , "ANY LOCK XACQUIRE XRELEASE OF=U SF=U AF=U PF=U CF=W"],
+    ["bts"              , "r32/m32, ub"                              , "MI"      , "0F BA /5 ib"                      , "ANY LOCK XACQUIRE XRELEASE OF=U SF=U AF=U PF=U CF=W"],
+    ["bts"              , "r64/m64, ub"                              , "MI"      , "REX.W 0F BA /5 ib"                , "X64 LOCK XACQUIRE XRELEASE OF=U SF=U AF=U PF=U CF=W"],
 
     ["call"             , "rel32"                                    , "D"       , "E8 cd"                            , "ANY VOLATILE PUSH OF=U SF=U ZF=U AF=U PF=U CF=U"],
     ["call"             , "R:r32/m32"                                , "M"       , "FF /2"                            , "X86 VOLATILE PUSH OF=U SF=U ZF=U AF=U PF=U CF=U"],
@@ -394,6 +401,12 @@ $export[$as] =
     ["clac"             , ""                                         , "NONE"    , "0F 01 CA"                         , "ANY VOLATILE SMAP FLAGS.AC=0"],
     ["clc"              , ""                                         , "NONE"    , "F8"                               , "ANY CF=0"],
     ["cld"              , ""                                         , "NONE"    , "FC"                               , "ANY DF=0"],
+    ["clflush"          , "R:mem"                                    , "M"       , "0F AE /7"                         , "ANY VOLATILE CLFLUSH"],
+    ["clflushopt"       , "R:mem"                                    , "M"       , "66 0F AE /7"                      , "ANY VOLATILE CLFLUSHOPT"],
+    ["cli"              , ""                                         , "NONE"    , "FA"                               , "ANY VOLATILE IF=W"],
+    ["clts"             , ""                                         , "NONE"    , "0F 06"                            , "ANY VOLATILE PRIVILEGE=L0"],
+    ["clwb"             , "R:mem"                                    , "M"       , "66 0F AE /6"                      , "ANY VOLATILE CLWB"],
+    ["clzero"           , "R:<ds:zax>"                               , "NONE"    , "0F 01 FC"                         , "ANY VOLATILE CLZERO"],
     ["cmc"              , ""                                         , "NONE"    , "F5"                               , "ANY CF=X"],
 
     ["cmovo"            , "r16, r16/m16"                             , "RM"      , "66 0F 40 /r"                      , "ANY CMOV OF=R"],
@@ -480,25 +493,25 @@ $export[$as] =
     ["cmpsd"            , "X:<ds:zsi>, X:<es:zdi>"                   , "NONE"    , "A7"                               , "ANY REP REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
     ["cmpsq"            , "X:<ds:zsi>, X:<es:zdi>"                   , "NONE"    , "REX.W A7"                         , "X64 REP REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
 
-    ["cmpxchg"          , "r8/m8, r8, <al>"                          , "MR"      , "0F B0 /r"                         , "ANY I486 LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["cmpxchg"          , "r16/m16, r16, <ax>"                       , "MR"      , "66 0F B1 /r"                      , "ANY I486 LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["cmpxchg"          , "r32/m32, r32, <eax>"                      , "MR"      , "0F B1 /r"                         , "ANY I486 LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["cmpxchg"          , "r64/m64, r64, <rax>"                      , "MR"      , "REX.W 0F B1 /r"                   , "X64 I486 LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["cmpxchg"          , "r8/m8, r8, <al>"                          , "MR"      , "0F B0 /r"                         , "ANY I486 LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["cmpxchg"          , "r16/m16, r16, <ax>"                       , "MR"      , "66 0F B1 /r"                      , "ANY I486 LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["cmpxchg"          , "r32/m32, r32, <eax>"                      , "MR"      , "0F B1 /r"                         , "ANY I486 LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["cmpxchg"          , "r64/m64, r64, <rax>"                      , "MR"      , "REX.W 0F B1 /r"                   , "X64 I486 LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
 
-    ["cmpxchg8b"        , "X:m64, X:<edx>, X:<eax>, <ecx>, <ebx>"    , "M"       , "0F C7 /1"                         , "ANY VOLATILE CMPXCHG8B LOCK ZF=W"],
-    ["cmpxchg16b"       , "X:m128, X:<rdx>, X:<rax>, <rcx>, <rbx>"   , "M"       , "REX.W 0F C7 /1"                   , "X64 VOLATILE CMPXCHG16B LOCK ZF=W"],
+    ["cmpxchg8b"        , "X:m64, X:<edx>, X:<eax>, <ecx>, <ebx>"    , "M"       , "0F C7 /1"                         , "ANY VOLATILE CMPXCHG8B LOCK XACQUIRE XRELEASE ZF=W"],
+    ["cmpxchg16b"       , "X:m128, X:<rdx>, X:<rax>, <rcx>, <rbx>"   , "M"       , "REX.W 0F C7 /1"                   , "X64 VOLATILE CMPXCHG16B LOCK XACQUIRE XRELEASE ZF=W"],
 
     ["cpuid"            , "X:<eax>, W:<ebx>, X:<ecx>, W:<edx>"       , "NONE"    , "0F A2"                            , "ANY VOLATILE I486"],
 
     ["daa"              , "<ax>"                                     , "NONE"    , "27"                               , "X86 OF=U SF=W ZF=W AF=W PF=W CF=W"],
     ["das"              , "<ax>"                                     , "NONE"    , "2F"                               , "X86 OF=U SF=W ZF=W AF=W PF=W CF=W"],
 
-    ["dec"              , "r16"                                      , "O"       , "66 48+r"                          , "X86 LOCK OF=W SF=W ZF=W AF=W PF=W"],
-    ["dec"              , "r32"                                      , "O"       , "48+r"                             , "X86 LOCK OF=W SF=W ZF=W AF=W PF=W"],
-    ["dec"              , "r8/m8"                                    , "M"       , "FE /1"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W"],
-    ["dec"              , "r16/m16"                                  , "M"       , "66 FF /1"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W"],
-    ["dec"              , "r32/m32"                                  , "M"       , "FF /1"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W"],
-    ["dec"              , "r64/m64"                                  , "M"       , "REX.W FF /1"                      , "X64 LOCK OF=W SF=W ZF=W AF=W PF=W"],
+    ["dec"              , "r16"                                      , "O"       , "66 48+r"                          , "X86 OF=W SF=W ZF=W AF=W PF=W"],
+    ["dec"              , "r32"                                      , "O"       , "48+r"                             , "X86 OF=W SF=W ZF=W AF=W PF=W"],
+    ["dec"              , "r8/m8"                                    , "M"       , "FE /1"                            , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W"],
+    ["dec"              , "r16/m16"                                  , "M"       , "66 FF /1"                         , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W"],
+    ["dec"              , "r32/m32"                                  , "M"       , "FF /1"                            , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W"],
+    ["dec"              , "r64/m64"                                  , "M"       , "REX.W FF /1"                      , "X64 LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W"],
 
     ["div"              , "X:<ax>, r8/m8"                            , "M"       , "F6 /6"                            , "ANY OF=U SF=U ZF=U AF=U PF=U CF=U"],
     ["div"              , "X:<dx>, X:<ax>, r16/m16"                  , "M"       , "66 F7 /6"                         , "ANY OF=U SF=U ZF=U AF=U PF=U CF=U"],
@@ -506,6 +519,13 @@ $export[$as] =
     ["div"              , "X:<rdx>, X:<rax>, r64/m64"                , "M"       , "REX.W F7 /6"                      , "X64 OF=U SF=U ZF=U AF=U PF=U CF=U"],
 
     ["enter"            , "uw, ub"                                   , "II"      , "C8 iw ib"                         , "ANY VOLATILE PUSH"],
+
+    ["fxrstor"          , "R:mem"                                    , "NONE"    , "0F AE /1"                         , "ANY VOLATILE FXSR C0=W C1=W C2=W C3=W"],
+    ["fxrstor64"        , "R:mem"                                    , "NONE"    , "REX.W 0F AE /1"                   , "X64 VOLATILE FXSR C0=W C1=W C2=W C3=W"],
+    ["fxsave"           , "W:mem"                                    , "NONE"    , "0F AE /0"                         , "ANY VOLATILE FXSR"],
+    ["fxsave64"         , "W:mem"                                    , "NONE"    , "REX.W 0F AE /0"                   , "X64 VOLATILE FXSR"],
+
+    ["hlt"              , ""                                         , "NONE"    , "F4"                               , "ANY VOLATILE PRIVILEGE=L0"],
 
     ["idiv"             , "X:<ax>, r8/m8"                            , "M"       , "F6 /7"                            , "ANY OF=U SF=U ZF=U AF=U PF=U CF=U"],
     ["idiv"             , "X:<dx>, X:<ax>, r16/m16"                  , "M"       , "66 F7 /7"                         , "ANY OF=U SF=U ZF=U AF=U PF=U CF=U"],
@@ -526,19 +546,20 @@ $export[$as] =
     ["imul"             , "W:r32, r32/m32, id/ud"                    , "RMI"     , "69 /r id"                         , "ANY OF=W SF=W ZF=U AF=U PF=U CF=W"],
     ["imul"             , "W:r64, r64/m64, id"                       , "RMI"     , "REX.W 69 /r id"                   , "X64 OF=W SF=W ZF=U AF=U PF=U CF=W"],
 
-    ["inc"              , "r16"                                      , "O"       , "66 40+r"                          , "X86 LOCK OF=W SF=W ZF=W AF=W PF=W"],
-    ["inc"              , "r32"                                      , "O"       , "40+r"                             , "X86 LOCK OF=W SF=W ZF=W AF=W PF=W"],
-    ["inc"              , "r8/m8"                                    , "M"       , "FE /0"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W"],
-    ["inc"              , "r16/m16"                                  , "M"       , "66 FF /0"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W"],
-    ["inc"              , "r32/m32"                                  , "M"       , "FF /0"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W"],
-    ["inc"              , "r64/m64"                                  , "M"       , "REX.W FF /0"                      , "X64 LOCK OF=W SF=W ZF=W AF=W PF=W"],
-
     ["in"               , "W:al, ub"                                 , "I"       , "E4 ib"                            , "ANY VOLATILE"],
     ["in"               , "W:ax, ub"                                 , "I"       , "66 E5 ib"                         , "ANY VOLATILE"],
     ["in"               , "W:eax, ub"                                , "I"       , "E5 ib"                            , "ANY VOLATILE"],
     ["in"               , "W:al, dx"                                 , "NONE"    , "EC"                               , "ANY VOLATILE"],
     ["in"               , "W:ax, dx"                                 , "NONE"    , "66 ED"                            , "ANY VOLATILE"],
     ["in"               , "W:eax, dx"                                , "NONE"    , "ED"                               , "ANY VOLATILE"],
+
+    ["inc"              , "r16"                                      , "O"       , "66 40+r"                          , "X86 OF=W SF=W ZF=W AF=W PF=W"],
+    ["inc"              , "r32"                                      , "O"       , "40+r"                             , "X86 OF=W SF=W ZF=W AF=W PF=W"],
+    ["inc"              , "r8/m8"                                    , "M"       , "FE /0"                            , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W"],
+    ["inc"              , "r16/m16"                                  , "M"       , "66 FF /0"                         , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W"],
+    ["inc"              , "r32/m32"                                  , "M"       , "FF /0"                            , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W"],
+    ["inc"              , "r64/m64"                                  , "M"       , "REX.W FF /0"                      , "X64 LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W"],
+
     ["insb"             , "W:es:zdi, dx"                             , "NONE"    , "6C"                               , "ANY VOLATILE REP REPNZ"],
     ["insw"             , "W:es:zdi, dx"                             , "NONE"    , "66 6D"                            , "ANY VOLATILE REP REPNZ"],
     ["insd"             , "W:es:zdi, dx"                             , "NONE"    , "6D"                               , "ANY VOLATILE REP REPNZ"],
@@ -546,6 +567,15 @@ $export[$as] =
     ["int"              , "ub"                                       , "I"       , "CD ib"                            , "ANY VOLATILE"],
     ["int3"             , ""                                         , "NONE"    , "CC"                               , "ANY VOLATILE"],
     ["into"             , ""                                         , "NONE"    , "CE"                               , "ANY VOLATILE OF=R"],
+
+    ["invd"             , ""                                         , "NONE"    , "0F 08"                            , "ANY VOLATILE PRIVILEGE=L0 I486"],
+    ["invlpg"           , "R:mem"                                    , "M"       , "0F 01 /7"                         , "ANY VOLATILE PRIVILEGE=L0 I486"],
+    ["invpcid"          , "R:r32, R:m128"                            , "RM"      , "66 0F 38 82 /r"                   , "X86 VOLATILE PRIVILEGE=L0 I486"],
+    ["invpcid"          , "R:r64, R:m128"                            , "RM"      , "66 0F 38 82 /r"                   , "X64 VOLATILE PRIVILEGE=L0 I486"],
+
+    ["iret/iretd"       , ""                                         , "NONE"    , "CF"                               , "ANY VOLATILE OF=U SF=U ZF=U AF=U PF=U CF=U"],
+    ["iretw"            , ""                                         , "NONE"    , "66 CF"                            , "ANY VOLATILE OF=U SF=U ZF=U AF=U PF=U CF=U"],
+    ["iretq"            , ""                                         , "NONE"    , "REX.W CF"                         , "X64 VOLATILE OF=U SF=U ZF=U AF=U PF=U CF=U"],
 
     ["jo"               , "rel8"                                     , "D"       , "70 cb"                            , "ANY VOLATILE OF=R"],
     ["jno"              , "rel8"                                     , "D"       , "71 cb"                            , "ANY VOLATILE OF=R"],
@@ -593,11 +623,40 @@ $export[$as] =
 
     ["lahf"             , "W:<ah>"                                   , "NONE"    , "9F"                               , "ANY VOLATILE LAHFSAHF SF=R ZF=R AF=R PF=R CF=R"],
 
+    ["lar"              , "W:r16, R:r16/m16"                         , "RM"      , "66 0F 02 /r"                      , "ANY VOLATILE ZF=W"],
+    ["lar"              , "W:r32, R:r32/m16"                         , "RM"      , "0F 02 /r"                         , "ANY VOLATILE ZF=W"],
+
+    ["lds"              , "r16, m16_16"                              , "RM"      , "66 C5 /r"                         , "X86 VOLATILE"],
+    ["lds"              , "r32, m16_32"                              , "RM"      , "C5 /r"                            , "X86 VOLATILE"],
+
     ["lea"              , "W:r16, mem"                               , "RM"      , "67 8D /r"                         , "ANY"],
     ["lea"              , "W:r32, mem"                               , "RM"      , "8D /r"                            , "ANY"],
     ["lea"              , "W:r64, mem"                               , "RM"      , "REX.W 8D /r"                      , "X64"],
 
+    ["les"              , "r16, m16_16"                              , "RM"      , "66 C4 /r"                         , "X86 VOLATILE"],
+    ["les"              , "r32, m16_32"                              , "RM"      , "C4 /r"                            , "X86 VOLATILE"],
+
     ["leave"            , ""                                         , "NONE"    , "C9"                               , "ANY VOLATILE POP"],
+
+    ["lfs"              , "r16, m16_16"                              , "RM"      , "66 0F B4 /r"                      , "ANY VOLATILE"],
+    ["lfs"              , "r32, m16_32"                              , "RM"      , "0F B4 /r"                         , "ANY VOLATILE"],
+    ["lfs"              , "r64, m16_64"                              , "RM"      , "REX.W 0F B4 /r"                   , "X64 VOLATILE"],
+
+    ["lgdt"             , "R:mem"                                    , "M"       , "0F 01 /2"                         , "ANY VOLATILE PRIVILEGE=L0"],
+
+    ["lgs"              , "r16, m16_16"                              , "RM"      , "66 0F B5 /r"                      , "ANY VOLATILE"],
+    ["lgs"              , "r32, m16_32"                              , "RM"      , "0F B5 /r"                         , "ANY VOLATILE"],
+    ["lgs"              , "r64, m16_64"                              , "RM"      , "REX.W 0F B5 /r"                   , "X64 VOLATILE"],
+
+    ["lidt"             , "R:mem"                                    , "M"       , "0F 01 /3"                         , "ANY VOLATILE PRIVILEGE=L0"],
+
+    ["lldt"             , "R:r16/m16"                                , "M"       , "66 0F 00 /2"                      , "ANY VOLATILE PRIVILEGE=L0"],
+    ["lldt"             , "R:r32/m16"                                , "M"       , "0F 00 /2"                         , "ANY VOLATILE PRIVILEGE=L0"],
+    ["lldt"             , "R:r64/m16"                                , "M"       , "REX.W 0F 00 /2"                   , "X64 VOLATILE PRIVILEGE=L0"],
+
+    ["lmsw"             , "R:r16/m16"                                , "M"       , "66 0F 01 /6"                      , "ANY VOLATILE PRIVILEGE=L0"],
+    ["lmsw"             , "R:r32/m16"                                , "M"       , "0F 01 /6"                         , "ANY VOLATILE PRIVILEGE=L0"],
+    ["lmsw"             , "R:r64/m16"                                , "M"       , "REX.W 0F 01 /6"                   , "X64 VOLATILE PRIVILEGE=L0"],
 
     ["lodsb"            , "W:<al>, X:<ds:zsi>"                       , "NONE"    , "AC"                               , "ANY REP REPNZ DF=R"],
     ["lodsw"            , "W:<ax>, X:<ds:zsi>"                       , "NONE"    , "66 AD"                            , "ANY REP REPNZ DF=R"],
@@ -619,10 +678,24 @@ $export[$as] =
     ["loopne"           , "X:<ecx>, rel8"                            , "D"       , "67 E0 cb"                         , "X64 VOLATILE ZF=R"],
     ["loopne"           , "X:<rcx>, rel8"                            , "D"       , "E0 cb"                            , "X64 VOLATILE ZF=R"],
 
-    ["mov"              , "W:r8/m8, r8"                              , "MR"      , "88 /r"                            , "ANY"],
-    ["mov"              , "W:r16/m16, r16"                           , "MR"      , "66 89 /r"                         , "ANY"],
-    ["mov"              , "W:r32/m32, r32"                           , "MR"      , "89 /r"                            , "ANY"],
-    ["mov"              , "W:r64/m64, r64"                           , "MR"      , "REX.W 89 /r"                      , "X64"],
+    ["lsl"              , "W:r16, R:r16/m16"                         , "RM"      , "66 0F 03 /r"                      , "ANY VOLATILE ZF=W"],
+    ["lsl"              , "W:r32, R:r32/m16"                         , "RM"      , "0F 03 /r"                         , "ANY VOLATILE ZF=W"],
+    ["lsl"              , "W:r64, R:r32/m16"                         , "RM"      , "REX.W 0F 03 /r"                   , "X64 VOLATILE ZF=W"],
+
+    ["lss"              , "r16, m16_16"                              , "RM"      , "66 0F B2 /r"                      , "ANY VOLATILE"],
+    ["lss"              , "r32, m16_32"                              , "RM"      , "0F B2 /r"                         , "ANY VOLATILE"],
+    ["lss"              , "r64, m16_64"                              , "RM"      , "REX.W 0F B2 /r"                   , "X64 VOLATILE"],
+
+    ["ltr"              , "R:r16/m16"                                , "M"       , "66 0F 00 /3"                      , "ANY VOLATILE PRIVILEGE=L0"],
+    ["ltr"              , "R:r32/m16"                                , "M"       , "0F 00 /3"                         , "ANY VOLATILE PRIVILEGE=L0"],
+    ["ltr"              , "R:r64/m16"                                , "M"       , "REX.W 0F 00 /3"                   , "X64 VOLATILE PRIVILEGE=L0"],
+
+    ["monitor"          , "R:<ds:zax>, R:<ecx>, R:<edx>"             , "NONE"    , "0F 01 C8"                         , "ANY VOLATILE PRIVILEGE=L0 MONITOR"],
+
+    ["mov"              , "W:r8/m8, r8"                              , "MR"      , "88 /r"                            , "ANY XRELEASE"],
+    ["mov"              , "W:r16/m16, r16"                           , "MR"      , "66 89 /r"                         , "ANY XRELEASE"],
+    ["mov"              , "W:r32/m32, r32"                           , "MR"      , "89 /r"                            , "ANY XRELEASE"],
+    ["mov"              , "W:r64/m64, r64"                           , "MR"      , "REX.W 89 /r"                      , "X64 XRELEASE"],
 
     ["mov"              , "W:r8, r8/m8"                              , "RM"      , "8A /r"                            , "ANY"],
     ["mov"              , "W:r16, r16/m16"                           , "RM"      , "66 8B /r"                         , "ANY"],
@@ -651,10 +724,10 @@ $export[$as] =
     ["mov"              , "W:r32, id/ud"                             , "I"       , "B8+r id"                          , "ANY"],
     ["mov"              , "W:r64, iq/uq"                             , "I"       , "REX.W B8+r iq"                    , "X64"],
 
-    ["mov"              , "W:r8/m8, ib/ub"                           , "MI"      , "C6 /0 ib"                         , "ANY"],
-    ["mov"              , "W:r16/m16, iw/uw"                         , "MI"      , "66 C7 /0 iw"                      , "ANY"],
-    ["mov"              , "W:r32/m32, id/ud"                         , "MI"      , "C7 /0 id"                         , "ANY"],
-    ["mov"              , "W:r64/m64, id"                            , "MI"      , "REX.W C7 /0 id"                   , "X64"],
+    ["mov"              , "W:r8/m8, ib/ub"                           , "MI"      , "C6 /0 ib"                         , "ANY XRELEASE"],
+    ["mov"              , "W:r16/m16, iw/uw"                         , "MI"      , "66 C7 /0 iw"                      , "ANY XRELEASE"],
+    ["mov"              , "W:r32/m32, id/ud"                         , "MI"      , "C7 /0 id"                         , "ANY XRELEASE"],
+    ["mov"              , "W:r64/m64, id"                            , "MI"      , "REX.W C7 /0 id"                   , "X64 XRELEASE"],
 
     ["mov"              , "W:r32, creg"                              , "MR"      , "0F 20 /r"                         , "X86 OF=U SF=U ZF=U AF=U PF=U CF=U"],
     ["mov"              , "W:r64, creg"                              , "MR"      , "0F 20 /r"                         , "X64 OF=U SF=U ZF=U AF=U PF=U CF=U"],
@@ -689,43 +762,45 @@ $export[$as] =
     ["mul"              , "W:<edx>, X:<eax>, r32/m32"                , "M"       , "F7 /4"                            , "ANY OF=W SF=U ZF=U AF=U PF=U CF=W"],
     ["mul"              , "W:<rdx>, X:<rax>, r64/m64"                , "M"       , "REX.W F7 /4"                      , "X64 OF=W SF=U ZF=U AF=U PF=U CF=W"],
 
-    ["neg"              , "r8/m8"                                    , "M"       , "F6 /3"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["neg"              , "r16/m16"                                  , "M"       , "66 F7 /3"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["neg"              , "r32/m32"                                  , "M"       , "F7 /3"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["neg"              , "r64/m64"                                  , "M"       , "REX.W F7 /3"                      , "X64 LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["mwait"            , "R:<eax>, R:<ecx>"                         , "NONE"    , "0F 01 C9"                         , "ANY VOLATILE PRIVILEGE=L0 MONITOR"],
+
+    ["neg"              , "r8/m8"                                    , "M"       , "F6 /3"                            , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["neg"              , "r16/m16"                                  , "M"       , "66 F7 /3"                         , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["neg"              , "r32/m32"                                  , "M"       , "F7 /3"                            , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["neg"              , "r64/m64"                                  , "M"       , "REX.W F7 /3"                      , "X64 LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
 
     ["nop"              , ""                                         , "NONE"    , "90"                               , "ANY"],
     ["nop"              , "R:r16/m16"                                , "M"       , "66 0F 1F /0"                      , "ANY"],
     ["nop"              , "R:r32/m32"                                , "M"       , "0F 1F /0"                         , "ANY"],
 
-    ["not"              , "r8/m8"                                    , "M"       , "F6 /2"                            , "ANY LOCK"],
-    ["not"              , "r16/m16"                                  , "M"       , "66 F7 /2"                         , "ANY LOCK"],
-    ["not"              , "r32/m32"                                  , "M"       , "F7 /2"                            , "ANY LOCK"],
-    ["not"              , "r64/m64"                                  , "M"       , "REX.W F7 /2"                      , "X64 LOCK"],
+    ["not"              , "r8/m8"                                    , "M"       , "F6 /2"                            , "ANY LOCK XACQUIRE XRELEASE"],
+    ["not"              , "r16/m16"                                  , "M"       , "66 F7 /2"                         , "ANY LOCK XACQUIRE XRELEASE"],
+    ["not"              , "r32/m32"                                  , "M"       , "F7 /2"                            , "ANY LOCK XACQUIRE XRELEASE"],
+    ["not"              , "r64/m64"                                  , "M"       , "REX.W F7 /2"                      , "X64 LOCK XACQUIRE XRELEASE"],
 
-    ["or"               , "al, ib/ub"                                , "I"       , "0C ib"                            , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["or"               , "ax, iw/uw"                                , "I"       , "66 0D iw"                         , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["or"               , "eax, id/ud"                               , "I"       , "0D id"                            , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["or"               , "rax, id"                                  , "I"       , "REX.W 0D id"                      , "X64 LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["or"               , "al, ib/ub"                                , "I"       , "0C ib"                            , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["or"               , "ax, iw/uw"                                , "I"       , "66 0D iw"                         , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["or"               , "eax, id/ud"                               , "I"       , "0D id"                            , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["or"               , "rax, id"                                  , "I"       , "REX.W 0D id"                      , "X64 OF=0 SF=W ZF=W AF=U PF=W CF=0"],
 
-    ["or"               , "r8/m8, ib/ub"                             , "MI"      , "80 /1 ib"                         , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["or"               , "r16/m16, iw/uw"                           , "MI"      , "66 81 /1 iw"                      , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["or"               , "r32/m32, id/ud"                           , "MI"      , "81 /1 id"                         , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["or"               , "r64/m64, id"                              , "MI"      , "REX.W 81 /1 id"                   , "X64 LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["or"               , "r8/m8, ib/ub"                             , "MI"      , "80 /1 ib"                         , "ANY LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["or"               , "r16/m16, iw/uw"                           , "MI"      , "66 81 /1 iw"                      , "ANY LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["or"               , "r32/m32, id/ud"                           , "MI"      , "81 /1 id"                         , "ANY LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["or"               , "r64/m64, id"                              , "MI"      , "REX.W 81 /1 id"                   , "X64 LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
 
-    ["or"               , "r16/m16, ib"                              , "MI"      , "66 83 /1 ib"                      , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["or"               , "r32/m32, ib"                              , "MI"      , "83 /1 ib"                         , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["or"               , "r64/m64, ib"                              , "MI"      , "REX.W 83 /1 ib"                   , "X64 LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["or"               , "r16/m16, ib"                              , "MI"      , "66 83 /1 ib"                      , "ANY LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["or"               , "r32/m32, ib"                              , "MI"      , "83 /1 ib"                         , "ANY LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["or"               , "r64/m64, ib"                              , "MI"      , "REX.W 83 /1 ib"                   , "X64 LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
 
-    ["or"               , "r8/m8, r8"                                , "MR"      , "08 /r"                            , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["or"               , "r16/m16, r16"                             , "MR"      , "66 09 /r"                         , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["or"               , "r32/m32, r32"                             , "MR"      , "09 /r"                            , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["or"               , "r64/m64, r64"                             , "MR"      , "REX.W 09 /r"                      , "X64 LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["or"               , "r8/m8, r8"                                , "MR"      , "08 /r"                            , "ANY LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["or"               , "r16/m16, r16"                             , "MR"      , "66 09 /r"                         , "ANY LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["or"               , "r32/m32, r32"                             , "MR"      , "09 /r"                            , "ANY LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["or"               , "r64/m64, r64"                             , "MR"      , "REX.W 09 /r"                      , "X64 LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
 
-    ["or"               , "r8, r8/m8"                                , "RM"      , "0A /r"                            , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["or"               , "r16, r16/m16"                             , "RM"      , "66 0B /r"                         , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["or"               , "r32, r32/m32"                             , "RM"      , "0B /r"                            , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["or"               , "r64, r64/m64"                             , "RM"      , "REX.W 0B /r"                      , "X64 LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["or"               , "r8, r8/m8"                                , "RM"      , "0A /r"                            , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["or"               , "r16, r16/m16"                             , "RM"      , "66 0B /r"                         , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["or"               , "r32, r32/m32"                             , "RM"      , "0B /r"                            , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["or"               , "r64, r64/m64"                             , "RM"      , "REX.W 0B /r"                      , "X64 OF=0 SF=W ZF=W AF=U PF=W CF=0"],
 
     ["out"              , "ub, al"                                   , "I"       , "E6 ib"                            , "ANY VOLATILE"],
     ["out"              , "ub, ax"                                   , "I"       , "66 E7 ib"                         , "ANY VOLATILE"],
@@ -738,6 +813,8 @@ $export[$as] =
     ["outsd"            , "R:dx, R:ds:zsi"                           , "NONE"    , "6F"                               , "ANY VOLATILE REP REPNZ"],
 
     ["pause"            , ""                                         , "NONE"    , "F3 90"                            , "ANY VOLATILE"],
+
+    ["pcommit"          , ""                                         , "NONE"    , "66 0F AE F8"                      , "ANY VOLATILE PCOMMIT"],
 
     ["pop"              , "W:r16/m16"                                , "M"       , "66 8F /0"                         , "ANY VOLATILE POP"],
     ["pop"              , "W:r32/m32"                                , "M"       , "8F /0"                            , "X86 VOLATILE POP"],
@@ -758,6 +835,9 @@ $export[$as] =
     ["popf"             , ""                                         , "NONE"    , "66 9D"                            , "ANY VOLATILE POP OF=W SF=W ZF=W AF=W PF=W CF=W"],
     ["popfd"            , ""                                         , "NONE"    , "9D"                               , "X86 VOLATILE POP OF=W SF=W ZF=W AF=W PF=W CF=W"],
     ["popfq"            , ""                                         , "NONE"    , "9D"                               , "X64 VOLATILE POP OF=W SF=W ZF=W AF=W PF=W CF=W"],
+
+    ["prefetchw"        , "R:mem"                                    , "M"       , "0F 0D /1"                         , "ANY PREFETCHW OF=U SF=U ZF=U AF=U PF=U CF=U"],
+    ["prefetchwt1"      , "R:mem"                                    , "M"       , "0F 0D /2"                         , "ANY PREFETCHWT1 OF=U SF=U ZF=U AF=U PF=U CF=U"],
 
     ["push"             , "R:r16/m16"                                , "M"       , "66 FF /6"                         , "ANY VOLATILE PUSH"],
     ["push"             , "R:r32/m32"                                , "M"       , "FF /6"                            , "X86 VOLATILE PUSH"],
@@ -816,6 +896,28 @@ $export[$as] =
     ["rcr"              , "r64/m64, cl"                              , "M"       , "REX.W D3 /3"                      , "X64 CF=W OF=W"],
     ["rcr"              , "r64/m64, ub"                              , "MI"      , "REX.W C1 /3 ib"                   , "X64 CF=W OF=W"],
 
+    ["rdfsbase"         , "W:r32"                                    , "M"       , "F3 0F AE /0"                      , "X64 VOLATILE FSGSBASE"],
+    ["rdfsbase"         , "W:r64"                                    , "M"       , "REX.W F3 0F AE /0"                , "X64 VOLATILE FSGSBASE"],
+    ["rdgsbase"         , "W:r32"                                    , "M"       , "F3 0F AE /1"                      , "X64 VOLATILE FSGSBASE"],
+    ["rdgsbase"         , "W:r64"                                    , "M"       , "REX.W F3 0F AE /1"                , "X64 VOLATILE FSGSBASE"],
+
+    ["rdmsr"            , "W:<edx>,W:<eax>,R:<ecx>"                  , "NONE"    , "0F 32"                            , "ANY VOLATILE PRIVILEGE=L0 MSR=R"],
+    ["rdpmc"            , "W:<edx>,W:<eax>,R:<ecx>"                  , "NONE"    , "0F 33"                            , "ANY VOLATILE PRIVILEGE=L0"],
+
+    ["rdrand"           , "W:r16"                                    , "M"       , "66 0F C7 /6"                      , "ANY VOLATILE RDRAND OF=0 SF=0 ZF=0 AF=0 PF=0 CF=W"],
+    ["rdrand"           , "W:r32"                                    , "M"       , "0F C7 /6"                         , "ANY VOLATILE RDRAND OF=0 SF=0 ZF=0 AF=0 PF=0 CF=W"],
+    ["rdrand"           , "W:r64"                                    , "M"       , "REX.W 0F C7 /6"                   , "X64 VOLATILE RDRAND OF=0 SF=0 ZF=0 AF=0 PF=0 CF=W"],
+
+    ["rdseed"           , "W:r16"                                    , "M"       , "66 0F C7 /7"                      , "ANY VOLATILE RDSEED OF=0 SF=0 ZF=0 AF=0 PF=0 CF=W"],
+    ["rdseed"           , "W:r32"                                    , "M"       , "0F C7 /7"                         , "ANY VOLATILE RDSEED OF=0 SF=0 ZF=0 AF=0 PF=0 CF=W"],
+    ["rdseed"           , "W:r64"                                    , "M"       , "REX.W 0F C7 /7"                   , "X64 VOLATILE RDSEED OF=0 SF=0 ZF=0 AF=0 PF=0 CF=W"],
+
+    ["rdtsc"            , "W:<edx>, W:<eax>"                         , "NONE"    , "0F 31"                            , "ANY VOLATILE RDTSC"],
+    ["rdtscp"           , "W:<edx>, W:<eax>, W:<ecx>"                , "NONE"    , "0F 01 F9"                         , "ANY VOLATILE RDTSCP"],
+
+    ["ret"              , ""                                         , "NONE"    , "C3"                               , "ANY VOLATILE POP"],
+    ["ret"              , "uw"                                       , "NONE"    , "C2 iw"                            , "ANY VOLATILE POP"],
+
     ["rol"              , "r8/m8, 1"                                 , "M"       , "D0 /0"                            , "ANY CF=W OF=W"],
     ["rol"              , "r8/m8, cl"                                , "M"       , "D2 /0"                            , "ANY CF=W OF=W"],
     ["rol"              , "r8/m8, ub"                                , "MI"      , "C0 /0 ib"                         , "ANY CF=W OF=W"],
@@ -848,8 +950,7 @@ $export[$as] =
     ["ror"              , "r64/m64, cl"                              , "M"       , "REX.W D3 /1"                      , "X64 CF=W OF=W"],
     ["ror"              , "r64/m64, ub"                              , "MI"      , "REX.W C1 /1 ib"                   , "X64 CF=W OF=W"],
 
-    ["ret"              , ""                                         , "NONE"    , "C3"                               , "ANY VOLATILE POP"],
-    ["ret"              , "uw"                                       , "NONE"    , "C2 iw"                            , "ANY VOLATILE POP"],
+    ["rsm"              , ""                                         , "NONE"    , "0F AA"                            , "X86 VOLATILE OF=U SF=U ZF=U AF=U PF=U CF=U"],
 
     ["sahf"             , "R:<ah>"                                   , "NONE"    , "9E"                               , "ANY VOLATILE LAHFSAHF SF=W ZF=W AF=W PF=W CF=W"],
 
@@ -885,45 +986,29 @@ $export[$as] =
     ["sar"              , "r64/m64, cl"                              , "M"       , "REX.W D3 /7"                      , "X64 OF=W SF=W ZF=W AF=W PF=W CF=W"],
     ["sar"              , "r64/m64, ub"                              , "MI"      , "REX.W C1 /7 ib"                   , "X64 OF=W SF=W ZF=W AF=W PF=W CF=W"],
 
-    ["shr"              , "r8/m8, 1"                                 , "M"       , "D0 /5"                            , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["shr"              , "r8/m8, cl"                                , "M"       , "D2 /5"                            , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["shr"              , "r8/m8, ub"                                , "MI"      , "C0 /5 ib"                         , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["sbb"              , "al, ib/ub"                                , "I"       , "1C ib"                            , "ANY OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["sbb"              , "ax, iw/uw"                                , "I"       , "66 1D iw"                         , "ANY OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["sbb"              , "eax, id/ud"                               , "I"       , "1D id"                            , "ANY OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["sbb"              , "rax, id"                                  , "I"       , "REX.W 1D id"                      , "X64 OF=W SF=W ZF=W AF=W PF=W CF=X"],
 
-    ["shr"              , "r16/m16, 1"                               , "M"       , "66 D1 /5"                         , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["shr"              , "r16/m16, cl"                              , "M"       , "66 D3 /5"                         , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["shr"              , "r16/m16, ub"                              , "MI"      , "66 C1 /5 ib"                      , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["sbb"              , "r8/m8, ib/ub"                             , "MI"      , "80 /3 ib"                         , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["sbb"              , "r16/m16, iw/uw"                           , "MI"      , "66 81 /3 iw"                      , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["sbb"              , "r32/m32, id/ud"                           , "MI"      , "81 /3 id"                         , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["sbb"              , "r64/m64, id"                              , "MI"      , "REX.W 81 /3 id"                   , "X64 LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=X"],
 
-    ["shr"              , "r32/m32, 1"                               , "M"       , "D1 /5"                            , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["shr"              , "r32/m32, cl"                              , "M"       , "D3 /5"                            , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["shr"              , "r32/m32, ub"                              , "MI"      , "C1 /5 ib"                         , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["sbb"              , "r16/m16, ib"                              , "MI"      , "66 83 /3 ib"                      , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["sbb"              , "r32/m32, ib"                              , "MI"      , "83 /3 ib"                         , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["sbb"              , "r64/m64, ib"                              , "MI"      , "REX.W 83 /3 ib"                   , "X64 LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=X"],
 
-    ["shr"              , "r64/m64, 1"                               , "M"       , "REX.W D1 /5"                      , "X64 OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["shr"              , "r64/m64, cl"                              , "M"       , "REX.W D3 /5"                      , "X64 OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["shr"              , "r64/m64, ub"                              , "MI"      , "REX.W C1 /5 ib"                   , "X64 OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["sbb"              , "r8/m8, r8"                                , "MR"      , "18 /r"                            , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["sbb"              , "r16/m16, r16"                             , "MR"      , "66 19 /r"                         , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["sbb"              , "r32/m32, r32"                             , "MR"      , "19 /r"                            , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["sbb"              , "r64/m64, r64"                             , "MR"      , "REX.W 19 /r"                      , "X64 LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=X"],
 
-    ["sbb"              , "al, ib/ub"                                , "I"       , "1C ib"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["sbb"              , "ax, iw/uw"                                , "I"       , "66 1D iw"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["sbb"              , "eax, id/ud"                               , "I"       , "1D id"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["sbb"              , "rax, id"                                  , "I"       , "REX.W 1D id"                      , "X64 LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-
-    ["sbb"              , "r8/m8, ib/ub"                             , "MI"      , "80 /3 ib"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["sbb"              , "r16/m16, iw/uw"                           , "MI"      , "66 81 /3 iw"                      , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["sbb"              , "r32/m32, id/ud"                           , "MI"      , "81 /3 id"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["sbb"              , "r64/m64, id"                              , "MI"      , "REX.W 81 /3 id"                   , "X64 LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-
-    ["sbb"              , "r16/m16, ib"                              , "MI"      , "66 83 /3 ib"                      , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["sbb"              , "r32/m32, ib"                              , "MI"      , "83 /3 ib"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["sbb"              , "r64/m64, ib"                              , "MI"      , "REX.W 83 /3 ib"                   , "X64 LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-
-    ["sbb"              , "r8/m8, r8"                                , "MR"      , "18 /r"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["sbb"              , "r16/m16, r16"                             , "MR"      , "66 19 /r"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["sbb"              , "r32/m32, r32"                             , "MR"      , "19 /r"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["sbb"              , "r64/m64, r64"                             , "MR"      , "REX.W 19 /r"                      , "X64 LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-
-    ["sbb"              , "r8, r8/m8"                                , "RM"      , "1A /r"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["sbb"              , "r16, r16/m16"                             , "RM"      , "66 1B /r"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["sbb"              , "r32, r32/m32"                             , "RM"      , "1B /r"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
-    ["sbb"              , "r64, r64/m64"                             , "RM"      , "REX.W 1B /r"                      , "X64 LOCK OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["sbb"              , "r8, r8/m8"                                , "RM"      , "1A /r"                            , "ANY OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["sbb"              , "r16, r16/m16"                             , "RM"      , "66 1B /r"                         , "ANY OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["sbb"              , "r32, r32/m32"                             , "RM"      , "1B /r"                            , "ANY OF=W SF=W ZF=W AF=W PF=W CF=X"],
+    ["sbb"              , "r64, r64/m64"                             , "RM"      , "REX.W 1B /r"                      , "X64 OF=W SF=W ZF=W AF=W PF=W CF=X"],
 
     ["scasb"            , "R:<al>, X:<es:zdi>"                       , "NONE"    , "AE"                               , "ANY REP REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
     ["scasw"            , "R:<ax>, X:<es:zdi>"                       , "NONE"    , "66 AF"                            , "ANY REP REPNZ OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
@@ -947,6 +1032,24 @@ $export[$as] =
     ["setle/setng"      , "W:r8/m8"                                  , "M"       , "0F 9E /r"                         , "ANY ZF=R SF=R OF=R"],
     ["setg/setnle"      , "W:r8/m8"                                  , "M"       , "0F 9F /r"                         , "ANY ZF=R SF=R OF=R"],
 
+    ["sgdt"             , "W:mem"                                    , "M"       , "0F 01 /0"                         , "ANY VOLATILE"],
+
+    ["shr"              , "r8/m8, 1"                                 , "M"       , "D0 /5"                            , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["shr"              , "r8/m8, cl"                                , "M"       , "D2 /5"                            , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["shr"              , "r8/m8, ub"                                , "MI"      , "C0 /5 ib"                         , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
+
+    ["shr"              , "r16/m16, 1"                               , "M"       , "66 D1 /5"                         , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["shr"              , "r16/m16, cl"                              , "M"       , "66 D3 /5"                         , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["shr"              , "r16/m16, ub"                              , "MI"      , "66 C1 /5 ib"                      , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
+
+    ["shr"              , "r32/m32, 1"                               , "M"       , "D1 /5"                            , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["shr"              , "r32/m32, cl"                              , "M"       , "D3 /5"                            , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["shr"              , "r32/m32, ub"                              , "MI"      , "C1 /5 ib"                         , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
+
+    ["shr"              , "r64/m64, 1"                               , "M"       , "REX.W D1 /5"                      , "X64 OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["shr"              , "r64/m64, cl"                              , "M"       , "REX.W D3 /5"                      , "X64 OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["shr"              , "r64/m64, ub"                              , "MI"      , "REX.W C1 /5 ib"                   , "X64 OF=W SF=W ZF=W AF=W PF=W CF=W"],
+
     ["shld"             , "r16/m16, r16, ub"                         , "MRI"     , "66 0F A4 /r ib"                   , "ANY OF=W SF=W ZF=W AF=U PF=W CF=W"],
     ["shld"             , "r16/m16, r16, cl"                         , "MR"      , "66 0F A5 /r"                      , "ANY OF=W SF=W ZF=W AF=U PF=W CF=W"],
     ["shld"             , "r32/m32, r32, ub"                         , "MRI"     , "0F A4 /r ib"                      , "ANY OF=W SF=W ZF=W AF=U PF=W CF=W"],
@@ -961,6 +1064,15 @@ $export[$as] =
     ["shrd"             , "r64/m64, r64, ub"                         , "MRI"     , "REX.W 0F AC /r ib"                , "X64 OF=W SF=W ZF=W AF=U PF=W CF=W"],
     ["shrd"             , "r64/m64, r64, cl"                         , "MR"      , "REX.W 0F AD /r"                   , "X64 OF=W SF=W ZF=W AF=U PF=W CF=W"],
 
+    ["sidt"             , "W:mem"                                    , "M"       , "0F 01 /1"                         , "ANY VOLATILE"],
+    ["sldt"             , "W:r16/m16"                                , "M"       , "66 0F 00 /0"                      , "ANY VOLATILE"],
+    ["sldt"             , "W:r32/m16"                                , "M"       , "0F 00 /0"                         , "ANY VOLATILE"],
+    ["sldt"             , "W:r64/m16"                                , "M"       , "REX.W 0F 00 /0"                   , "X64 VOLATILE"],
+
+    ["smsw"             , "W:r16/m16"                                , "M"       , "66 0F 01 /4"                      , "ANY VOLATILE"],
+    ["smsw"             , "W:r32/m16"                                , "M"       , "0F 01 /4"                         , "ANY VOLATILE"],
+    ["smsw"             , "W:r64/m16"                                , "M"       , "REX.W 0F 01 /4"                   , "X64 VOLATILE"],
+
     ["stac"             , ""                                         , "NONE"    , "0F 01 CB"                         , "ANY VOLATILE SMAP FLAGS.AC=1"],
     ["stc"              , ""                                         , "NONE"    , "F9"                               , "ANY CF=1"],
     ["std"              , ""                                         , "NONE"    , "FD"                               , "ANY DF=1"],
@@ -971,29 +1083,35 @@ $export[$as] =
     ["stosd"            , "X:<es:zdi>, R:<eax>"                      , "NONE"    , "AB"                               , "ANY REP REPNZ DF=R"],
     ["stosq"            , "X:<es:zdi>, R:<rax>"                      , "NONE"    , "REX.W AB"                         , "X64 REP REPNZ DF=R"],
 
-    ["sub"              , "al, ib/ub"                                , "I"       , "2C ib"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["sub"              , "ax, iw/uw"                                , "I"       , "66 2D iw"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["sub"              , "eax, id/ud"                               , "I"       , "2D id"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["sub"              , "rax, id"                                  , "I"       , "REX.W 2D id"                      , "X64 LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["str"              , "W:r16/m16"                                , "M"       , "66 0F 00 /1"                      , "ANY VOLATILE"],
+    ["str"              , "W:r32/m16"                                , "M"       , "0F 00 /1"                         , "ANY VOLATILE"],
+    ["str"              , "W:r64/m16"                                , "M"       , "REX.W 0F 00 /1"                   , "X64 VOLATILE"],
 
-    ["sub"              , "r8/m8, ib/ub"                             , "MI"      , "80 /5 ib"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["sub"              , "r16/m16, iw/uw"                           , "MI"      , "66 81 /5 iw"                      , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["sub"              , "r32/m32, id/ud"                           , "MI"      , "81 /5 id"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["sub"              , "r64/m64, id"                              , "MI"      , "REX.W 81 /5 id"                   , "X64 LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["sub"              , "al, ib/ub"                                , "I"       , "2C ib"                            , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["sub"              , "ax, iw/uw"                                , "I"       , "66 2D iw"                         , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["sub"              , "eax, id/ud"                               , "I"       , "2D id"                            , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["sub"              , "rax, id"                                  , "I"       , "REX.W 2D id"                      , "X64 OF=W SF=W ZF=W AF=W PF=W CF=W"],
 
-    ["sub"              , "r16/m16, ib"                              , "MI"      , "66 83 /5 ib"                      , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["sub"              , "r32/m32, ib"                              , "MI"      , "83 /5 ib"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["sub"              , "r64/m64, ib"                              , "MI"      , "REX.W 83 /5 ib"                   , "X64 LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["sub"              , "r8/m8, ib/ub"                             , "MI"      , "80 /5 ib"                         , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["sub"              , "r16/m16, iw/uw"                           , "MI"      , "66 81 /5 iw"                      , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["sub"              , "r32/m32, id/ud"                           , "MI"      , "81 /5 id"                         , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["sub"              , "r64/m64, id"                              , "MI"      , "REX.W 81 /5 id"                   , "X64 LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
 
-    ["sub"              , "r8/m8, r8"                                , "MR"      , "28 /r"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["sub"              , "r16/m16, r16"                             , "MR"      , "66 29 /r"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["sub"              , "r32/m32, r32"                             , "MR"      , "29 /r"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["sub"              , "r64/m64, r64"                             , "MR"      , "REX.W 29 /r"                      , "X64 LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["sub"              , "r16/m16, ib"                              , "MI"      , "66 83 /5 ib"                      , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["sub"              , "r32/m32, ib"                              , "MI"      , "83 /5 ib"                         , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["sub"              , "r64/m64, ib"                              , "MI"      , "REX.W 83 /5 ib"                   , "X64 LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
 
-    ["sub"              , "r8, r8/m8"                                , "RM"      , "2A /r"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["sub"              , "r16, r16/m16"                             , "RM"      , "66 2B /r"                         , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["sub"              , "r32, r32/m32"                             , "RM"      , "2B /r"                            , "ANY LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["sub"              , "r64, r64/m64"                             , "RM"      , "REX.W 2B /r"                      , "X64 LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["sub"              , "r8/m8, r8"                                , "MR"      , "28 /r"                            , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["sub"              , "r16/m16, r16"                             , "MR"      , "66 29 /r"                         , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["sub"              , "r32/m32, r32"                             , "MR"      , "29 /r"                            , "ANY LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["sub"              , "r64/m64, r64"                             , "MR"      , "REX.W 29 /r"                      , "X64 LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+
+    ["sub"              , "r8, r8/m8"                                , "RM"      , "2A /r"                            , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["sub"              , "r16, r16/m16"                             , "RM"      , "66 2B /r"                         , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["sub"              , "r32, r32/m32"                             , "RM"      , "2B /r"                            , "ANY OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["sub"              , "r64, r64/m64"                             , "RM"      , "REX.W 2B /r"                      , "X64 OF=W SF=W ZF=W AF=W PF=W CF=W"],
+
+    ["swapgs"           , ""                                         , "NONE"    , "0F 01 F8"                         , "X64 VOLATILE PRIVILEGE=L0"],
 
     ["syscall"          , ""                                         , "NONE"    , "0F 05"                            , "X64 VOLATILE"],
     ["sysenter"         , ""                                         , "NONE"    , "0F 34"                            , "ANY VOLATILE"],
@@ -1002,119 +1120,100 @@ $export[$as] =
     ["sysret"           , ""                                         , "NONE"    , "0F 07"                            , "X64 VOLATILE PRIVILEGE=L0"],
     ["sysret64"         , ""                                         , "NONE"    , "REX.W 0F 07"                      , "X64 VOLATILE PRIVILEGE=L0"],
 
-    ["swapgs"           , ""                                         , "NONE"    , "0F 01 F8"                         , "X64 VOLATILE PRIVILEGE=L0"],
+    ["test"             , "R:al, ib/ub"                              , "I"       , "A8 ib"                            , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["test"             , "R:ax, iw/uw"                              , "I"       , "66 A9 iw"                         , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["test"             , "R:eax, id/ud"                             , "I"       , "A9 id"                            , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["test"             , "R:rax, id"                                , "I"       , "REX.W A9 id"                      , "X64 OF=0 SF=W ZF=W AF=U PF=W CF=0"],
 
-    ["test"             , "R:al, ib/ub"                              , "I"       , "A8 ib"                            , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["test"             , "R:ax, iw/uw"                              , "I"       , "66 A9 iw"                         , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["test"             , "R:eax, id/ud"                             , "I"       , "A9 id"                            , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["test"             , "R:rax, id"                                , "I"       , "REX.W A9 id"                      , "X64 LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["test"             , "R:r8/m8, ib/ub"                           , "MI"      , "F6 /0 ib"                         , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["test"             , "R:r16/m16, iw/uw"                         , "MI"      , "66 F7 /0 iw"                      , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["test"             , "R:r32/m32, id/ud"                         , "MI"      , "F7 /0 id"                         , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["test"             , "R:r64/m64, id"                            , "MI"      , "REX.W F7 /0 id"                   , "X64 OF=0 SF=W ZF=W AF=U PF=W CF=0"],
 
-    ["test"             , "R:r8/m8, ib/ub"                           , "MI"      , "F6 /0 ib"                         , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["test"             , "R:r16/m16, iw/uw"                         , "MI"      , "66 F7 /0 iw"                      , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["test"             , "R:r32/m32, id/ud"                         , "MI"      , "F7 /0 id"                         , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["test"             , "R:r64/m64, id"                            , "MI"      , "REX.W F7 /0 id"                   , "X64 LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-
-    ["test"             , "R:r8/m8, r8"                              , "MR"      , "84 /r"                            , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["test"             , "R:r16/m16, r16"                           , "MR"      , "66 85 /r"                         , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["test"             , "R:r32/m32, r32"                           , "MR"      , "85 /r"                            , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["test"             , "R:r64/m64, r64"                           , "MR"      , "REX.W 85 /r"                      , "X64 LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["test"             , "R:r8/m8, r8"                              , "MR"      , "84 /r"                            , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["test"             , "R:r16/m16, r16"                           , "MR"      , "66 85 /r"                         , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["test"             , "R:r32/m32, r32"                           , "MR"      , "85 /r"                            , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["test"             , "R:r64/m64, r64"                           , "MR"      , "REX.W 85 /r"                      , "X64 OF=0 SF=W ZF=W AF=U PF=W CF=0"],
 
     ["ud2"              , ""                                         , "NONE"    , "0F 0B"                            , "ANY"],
 
-    ["xadd"             , "X:r8/m8, X:r8"                            , "MR"      , "0F C0 /r"                         , "ANY I486 LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["xadd"             , "X:r16/m16, X:r16"                         , "MR"      , "66 0F C1 /r"                      , "ANY I486 LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["xadd"             , "X:r32/m32, X:r32"                         , "MR"      , "0F C1 /r"                         , "ANY I486 LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
-    ["xadd"             , "X:r64/m64, X:r64"                         , "MR"      , "REX.W 0F C1 /r"                   , "X64 I486 LOCK OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["verr"             , "R:r16/m16"                                , "M"       , "66 0F 00 /4"                      , "ANY VOLATILE ZF=W"],
+    ["verr"             , "R:r32/m16"                                , "M"       , "0F 00 /4"                         , "ANY VOLATILE ZF=W"],
+    ["verr"             , "R:r64/m16"                                , "M"       , "REX.W 0F 00 /4"                   , "X64 VOLATILE ZF=W"],
+    ["verw"             , "R:r16/m16"                                , "M"       , "66 0F 00 /5"                      , "ANY VOLATILE ZF=W"],
+    ["verw"             , "R:r32/m16"                                , "M"       , "0F 00 /5"                         , "ANY VOLATILE ZF=W"],
+    ["verw"             , "R:r64/m16"                                , "M"       , "REX.W 0F 00 /5"                   , "X64 VOLATILE ZF=W"],
 
-    ["xchg"             , "X:ax, X:r16"                              , "O"       , "66 90+r"                          , "ANY LOCK IMPLICIT_LOCK"],
-    ["xchg"             , "X:eax, X:r32"                             , "O"       , "90+r"                             , "ANY LOCK IMPLICIT_LOCK"],
-    ["xchg"             , "X:rax, X:r64"                             , "O"       , "REX.W 90+r"                       , "X64 LOCK IMPLICIT_LOCK"],
+    ["wbinvd"           , ""                                         , "NONE"    , "0F 09"                            , "ANY VOLATILE PRIVILEGE=L0"],
 
-    ["xchg"             , "X:r16, X:ax"                              , "O"       , "66 90+r"                          , "ANY LOCK IMPLICIT_LOCK"],
-    ["xchg"             , "X:r32, X:eax"                             , "O"       , "90+r"                             , "ANY LOCK IMPLICIT_LOCK"],
-    ["xchg"             , "X:r64, X:rax"                             , "O"       , "REX.W 90+r"                       , "X64 LOCK IMPLICIT_LOCK"],
+    ["wrfsbase"         , "R:r32"                                    , "M"       , "F3 0F AE /2"                      , "X64 VOLATILE FSGSBASE"],
+    ["wrfsbase"         , "R:r64"                                    , "M"       , "REX.W F3 0F AE /2"                , "X64 VOLATILE FSGSBASE"],
+    ["wrgsbase"         , "R:r32"                                    , "M"       , "F3 0F AE /3"                      , "X64 VOLATILE FSGSBASE"],
+    ["wrgsbase"         , "R:r64"                                    , "M"       , "REX.W F3 0F AE /3"                , "X64 VOLATILE FSGSBASE"],
 
-    ["xchg"             , "X:r8/m8, X:r8"                            , "MR"      , "86 /r"                            , "ANY LOCK IMPLICIT_LOCK"],
-    ["xchg"             , "X:r16/m16, X:r16"                         , "MR"      , "66 87 /r"                         , "ANY LOCK IMPLICIT_LOCK"],
-    ["xchg"             , "X:r32/m32, X:r32"                         , "MR"      , "87 /r"                            , "ANY LOCK IMPLICIT_LOCK"],
-    ["xchg"             , "X:r64/m64, X:r64"                         , "MR"      , "REX.W 87 /r"                      , "X64 LOCK IMPLICIT_LOCK"],
+    ["wrmsr"            , "R:<edx>,R:<eax>,R:<ecx>"                  , "NONE"    , "0F 30"                            , "ANY VOLATILE PRIVILEGE=L0 MSR=W"],
+
+    ["xabort"           , "ub"                                       , "NONE"    , "C6 /7 ib"                         , "ANY VOLATILE RTM"],
+
+    ["xadd"             , "X:r8/m8, X:r8"                            , "MR"      , "0F C0 /r"                         , "ANY I486 LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["xadd"             , "X:r16/m16, X:r16"                         , "MR"      , "66 0F C1 /r"                      , "ANY I486 LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["xadd"             , "X:r32/m32, X:r32"                         , "MR"      , "0F C1 /r"                         , "ANY I486 LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+    ["xadd"             , "X:r64/m64, X:r64"                         , "MR"      , "REX.W 0F C1 /r"                   , "X64 I486 LOCK XACQUIRE XRELEASE OF=W SF=W ZF=W AF=W PF=W CF=W"],
+
+    ["xbegin"           , "rel16"                                    , "NONE"    , "66 C7 /7 cw"                      , "ANY VOLATILE RTM"],
+    ["xbegin"           , "rel32"                                    , "NONE"    , "C7 /7 cd"                         , "ANY VOLATILE RTM"],
+    ["xend"             , ""                                         , "NONE"    , "0F 01 D5"                         , "ANY VOLATILE RTM"],
+
+    ["xchg"             , "X:ax, X:r16"                              , "O"       , "66 90+r"                          , "ANY"],
+    ["xchg"             , "X:eax, X:r32"                             , "O"       , "90+r"                             , "ANY"],
+    ["xchg"             , "X:rax, X:r64"                             , "O"       , "REX.W 90+r"                       , "X64"],
+
+    ["xchg"             , "X:r16, X:ax"                              , "O"       , "66 90+r"                          , "ANY"],
+    ["xchg"             , "X:r32, X:eax"                             , "O"       , "90+r"                             , "ANY"],
+    ["xchg"             , "X:r64, X:rax"                             , "O"       , "REX.W 90+r"                       , "X64"],
+
+    ["xchg"             , "X:r8/m8, X:r8"                            , "MR"      , "86 /r"                            , "ANY LOCK IMPLICIT_LOCK XACQUIRE"],
+    ["xchg"             , "X:r16/m16, X:r16"                         , "MR"      , "66 87 /r"                         , "ANY LOCK IMPLICIT_LOCK XACQUIRE"],
+    ["xchg"             , "X:r32/m32, X:r32"                         , "MR"      , "87 /r"                            , "ANY LOCK IMPLICIT_LOCK XACQUIRE"],
+    ["xchg"             , "X:r64/m64, X:r64"                         , "MR"      , "REX.W 87 /r"                      , "X64 LOCK IMPLICIT_LOCK XACQUIRE"],
 
     ["xchg"             , "X:r8, X:r8/m8"                            , "RM"      , "86 /r"                            , "ANY LOCK IMPLICIT_LOCK"],
     ["xchg"             , "X:r16, X:r16/m16"                         , "RM"      , "66 87 /r"                         , "ANY LOCK IMPLICIT_LOCK"],
     ["xchg"             , "X:r32, X:r32/m32"                         , "RM"      , "87 /r"                            , "ANY LOCK IMPLICIT_LOCK"],
     ["xchg"             , "X:r64, X:r64/m64"                         , "RM"      , "REX.W 87 /r"                      , "X64 LOCK IMPLICIT_LOCK"],
 
-    ["xor"              , "X:al, ib/ub"                              , "I"       , "34 ib"                            , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["xor"              , "X:ax, iw/uw"                              , "I"       , "66 35 iw"                         , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["xor"              , "X:eax, id/ud"                             , "I"       , "35 id"                            , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["xor"              , "X:rax, id"                                , "I"       , "REX.W 35 id"                      , "X64 LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-
-    ["xor"              , "X:r8/m8, ib/ub"                           , "MI"      , "80 /6 ib"                         , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["xor"              , "X:r16/m16, iw/uw"                         , "MI"      , "66 81 /6 iw"                      , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["xor"              , "X:r32/m32, id/ud"                         , "MI"      , "81 /6 id"                         , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["xor"              , "X:r64/m64, id"                            , "MI"      , "REX.W 81 /6 id"                   , "X64 LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-
-    ["xor"              , "X:r16/m16, ib"                            , "MI"      , "66 83 /6 ib"                      , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["xor"              , "X:r32/m32, ib"                            , "MI"      , "83 /6 ib"                         , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["xor"              , "X:r64/m64, ib"                            , "MI"      , "REX.W 83 /6 ib"                   , "X64 LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-
-    ["xor"              , "X:r8/m8, r8"                              , "MR"      , "30 /r"                            , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["xor"              , "X:r16/m16, r16"                           , "MR"      , "66 31 /r"                         , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["xor"              , "X:r32/m32, r32"                           , "MR"      , "31 /r"                            , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["xor"              , "X:r64/m64, r64"                           , "MR"      , "REX.W 31 /r"                      , "X64 LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-
-    ["xor"              , "X:r8, r8/m8"                              , "RM"      , "32 /r"                            , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["xor"              , "X:r16, r16/m16"                           , "RM"      , "66 33 /r"                         , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["xor"              , "X:r32, r32/m32"                           , "RM"      , "33 /r"                            , "ANY LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-    ["xor"              , "X:r64, r64/m64"                           , "RM"      , "REX.W 33 /r"                      , "X64 LOCK OF=0 SF=W ZF=W AF=U PF=W CF=0"],
-
-    ["bndcl"            , "R:bnd, r32/m32"                           , "RM"      , "F3 0F 1A /r"                      , "X86 MPX"],
-    ["bndcl"            , "R:bnd, r64/m64"                           , "RM"      , "F3 0F 1A /r"                      , "X64 MPX"],
-    ["bndcn"            , "R:bnd, r32/m32"                           , "RM"      , "F2 0F 1B /r"                      , "X86 MPX"],
-    ["bndcn"            , "R:bnd, r64/m64"                           , "RM"      , "F2 0F 1B /r"                      , "X64 MPX"],
-    ["bndcu"            , "R:bnd, r32/m32"                           , "RM"      , "F2 0F 1A /r"                      , "X86 MPX"],
-    ["bndcu"            , "R:bnd, r64/m64"                           , "RM"      , "F2 0F 1A /r"                      , "X64 MPX"],
-    ["bndldx"           , "W:bnd, mib"                               , "RM"      , "0F 1A /r"                         , "ANY MPX"],
-    ["bndmk"            , "W:bnd, mem"                               , "RM"      , "F3 0F 1B /r"                      , "ANY MPX"],
-    ["bndmov"           , "W:bnd, bnd/mem"                           , "RM"      , "66 0F 1A /r"                      , "ANY MPX"],
-    ["bndmov"           , "W:bnd/mem, bnd"                           , "MR"      , "66 0F 1B /r"                      , "ANY MPX"],
-    ["bndstx"           , "W:mib, bnd"                               , "MR"      , "0F 1B /r"                         , "ANY MPX"],
-
-    ["clflush"          , "R:mem"                                    , "M"       , "0F AE /7"                         , "ANY VOLATILE CLFLUSH"],
-    ["clflushopt"       , "R:mem"                                    , "M"       , "66 0F AE /7"                      , "ANY VOLATILE CLFLUSHOPT"],
-    ["clwb"             , "R:mem"                                    , "M"       , "66 0F AE /6"                      , "ANY VOLATILE CLWB"],
-    ["clzero"           , "R:<ds:zax>"                               , "NONE"    , "0F 01 FC"                         , "ANY VOLATILE CLZERO"],
-    ["pcommit"          , ""                                         , "NONE"    , "66 0F AE F8"                      , "ANY VOLATILE PCOMMIT"],
-
-    ["prefetchw"        , "R:mem"                                    , "M"       , "0F 0D /1"                         , "ANY PREFETCHW OF=U SF=U ZF=U AF=U PF=U CF=U"],
-    ["prefetchwt1"      , "R:mem"                                    , "M"       , "0F 0D /2"                         , "ANY PREFETCHWT1 OF=U SF=U ZF=U AF=U PF=U CF=U"],
-
-    ["rdtsc"            , "W:<edx>, W:<eax>"                         , "NONE"    , "0F 31"                            , "ANY VOLATILE RDTSC"],
-    ["rdtscp"           , "W:<edx>, W:<eax>, W:<ecx>"                , "NONE"    , "0F 01 F9"                         , "ANY VOLATILE RDTSCP"],
-
-    ["rdfsbase"         , "W:r32"                                    , "M"       , "F3 0F AE /0"                      , "X64 VOLATILE FSGSBASE"],
-    ["rdfsbase"         , "W:r64"                                    , "M"       , "REX.W F3 0F AE /0"                , "X64 VOLATILE FSGSBASE"],
-    ["rdgsbase"         , "W:r32"                                    , "M"       , "F3 0F AE /1"                      , "X64 VOLATILE FSGSBASE"],
-    ["rdgsbase"         , "W:r64"                                    , "M"       , "REX.W F3 0F AE /1"                , "X64 VOLATILE FSGSBASE"],
-    ["wrfsbase"         , "R:r32"                                    , "M"       , "F3 0F AE /2"                      , "X64 VOLATILE FSGSBASE"],
-    ["wrfsbase"         , "R:r64"                                    , "M"       , "REX.W F3 0F AE /2"                , "X64 VOLATILE FSGSBASE"],
-    ["wrgsbase"         , "R:r32"                                    , "M"       , "F3 0F AE /3"                      , "X64 VOLATILE FSGSBASE"],
-    ["wrgsbase"         , "R:r64"                                    , "M"       , "REX.W F3 0F AE /3"                , "X64 VOLATILE FSGSBASE"],
-
-    ["rdrand"           , "W:r16"                                    , "M"       , "66 0F C7 /6"                      , "ANY VOLATILE RDRAND OF=0 SF=0 ZF=0 AF=0 PF=0 CF=W"],
-    ["rdrand"           , "W:r32"                                    , "M"       , "0F C7 /6"                         , "ANY VOLATILE RDRAND OF=0 SF=0 ZF=0 AF=0 PF=0 CF=W"],
-    ["rdrand"           , "W:r64"                                    , "M"       , "REX.W 0F C7 /6"                   , "X64 VOLATILE RDRAND OF=0 SF=0 ZF=0 AF=0 PF=0 CF=W"],
-    ["rdseed"           , "W:r16"                                    , "M"       , "66 0F C7 /7"                      , "ANY VOLATILE RDSEED OF=0 SF=0 ZF=0 AF=0 PF=0 CF=W"],
-    ["rdseed"           , "W:r32"                                    , "M"       , "0F C7 /7"                         , "ANY VOLATILE RDSEED OF=0 SF=0 ZF=0 AF=0 PF=0 CF=W"],
-    ["rdseed"           , "W:r64"                                    , "M"       , "REX.W 0F C7 /7"                   , "X64 VOLATILE RDSEED OF=0 SF=0 ZF=0 AF=0 PF=0 CF=W"],
-
     ["xgetbv"           , "W:<edx>, W:<eax>, R:<ecx>"                , "NONE"    , "0F 01 D0"                         , "ANY VOLATILE XSAVE XCR=R"],
-    ["xsetbv"           , "R:<edx>, R:<eax>, R:<ecx>"                , "NONE"    , "0F 01 D1"                         , "ANY VOLATILE XSAVE XCR=W PRIVILEGE=L0"],
+    ["xlatb"            , ""                                         , "NONE"    , "D7"                               , "ANY VOLATILE"],
+
+    ["xor"              , "X:al, ib/ub"                              , "I"       , "34 ib"                            , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["xor"              , "X:ax, iw/uw"                              , "I"       , "66 35 iw"                         , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["xor"              , "X:eax, id/ud"                             , "I"       , "35 id"                            , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["xor"              , "X:rax, id"                                , "I"       , "REX.W 35 id"                      , "X64 OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+
+    ["xor"              , "X:r8/m8, ib/ub"                           , "MI"      , "80 /6 ib"                         , "ANY LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["xor"              , "X:r16/m16, iw/uw"                         , "MI"      , "66 81 /6 iw"                      , "ANY LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["xor"              , "X:r32/m32, id/ud"                         , "MI"      , "81 /6 id"                         , "ANY LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["xor"              , "X:r64/m64, id"                            , "MI"      , "REX.W 81 /6 id"                   , "X64 LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+
+    ["xor"              , "X:r16/m16, ib"                            , "MI"      , "66 83 /6 ib"                      , "ANY LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["xor"              , "X:r32/m32, ib"                            , "MI"      , "83 /6 ib"                         , "ANY LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["xor"              , "X:r64/m64, ib"                            , "MI"      , "REX.W 83 /6 ib"                   , "X64 LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+
+    ["xor"              , "X:r8/m8, r8"                              , "MR"      , "30 /r"                            , "ANY LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["xor"              , "X:r16/m16, r16"                           , "MR"      , "66 31 /r"                         , "ANY LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["xor"              , "X:r32/m32, r32"                           , "MR"      , "31 /r"                            , "ANY LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["xor"              , "X:r64/m64, r64"                           , "MR"      , "REX.W 31 /r"                      , "X64 LOCK XACQUIRE XRELEASE OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+
+    ["xor"              , "X:r8, r8/m8"                              , "RM"      , "32 /r"                            , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["xor"              , "X:r16, r16/m16"                           , "RM"      , "66 33 /r"                         , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["xor"              , "X:r32, r32/m32"                           , "RM"      , "33 /r"                            , "ANY OF=0 SF=W ZF=W AF=U PF=W CF=0"],
+    ["xor"              , "X:r64, r64/m64"                           , "RM"      , "REX.W 33 /r"                      , "X64 OF=0 SF=W ZF=W AF=U PF=W CF=0"],
 
     ["xrstor"           , "R:mem, <edx>, <eax>"                      , "M"       , "0F AE /5"                         , "ANY VOLATILE XSAVE XCR=R"],
     ["xrstor64"         , "R:mem, <edx>, <eax>"                      , "M"       , "REX.W 0F AE /5"                   , "X64 VOLATILE XSAVE XCR=R"],
     ["xrstors"          , "R:mem, <edx>, <eax>"                      , "M"       , "0F C7 /3"                         , "ANY VOLATILE XSAVE XCR=R"],
     ["xrstors64"        , "R:mem, <edx>, <eax>"                      , "M"       , "REX.W 0F C7 /3"                   , "X64 VOLATILE XSAVE XCR=R"],
+
     ["xsave"            , "W:mem, <edx>, <eax>"                      , "M"       , "0F AE /4"                         , "ANY VOLATILE XSAVE XCR=R"],
     ["xsave64"          , "W:mem, <edx>, <eax>"                      , "M"       , "REX.W 0F AE /4"                   , "X64 VOLATILE XSAVE XCR=R"],
     ["xsavec"           , "W:mem, <edx>, <eax>"                      , "M"       , "0F C7 /4"                         , "ANY VOLATILE XSAVE XCR=R"],
@@ -1124,52 +1223,9 @@ $export[$as] =
     ["xsaves"           , "W:mem, <edx>, <eax>"                      , "M"       , "0F C7 /5"                         , "ANY VOLATILE XSAVE XCR=R"],
     ["xsaves64"         , "W:mem, <edx>, <eax>"                      , "M"       , "REX.W 0F C7 /5"                   , "X64 VOLATILE XSAVE XCR=R"],
 
-    ["cli"              , ""                                         , "NONE"    , "FA"                               , "ANY VOLATILE IF=W"],
-    ["clts"             , ""                                         , "NONE"    , "0F 06"                            , "ANY VOLATILE PRIVILEGE=L0"],
-    ["hlt"              , ""                                         , "NONE"    , "F4"                               , "ANY VOLATILE PRIVILEGE=L0"],
-    ["invd"             , ""                                         , "NONE"    , "0F 08"                            , "ANY VOLATILE PRIVILEGE=L0 I486"],
-    ["invlpg"           , "R:mem"                                    , "M"       , "0F 01 /7"                         , "ANY VOLATILE PRIVILEGE=L0 I486"],
-    ["invpcid"          , "R:r32, R:m128"                            , "RM"      , "66 0F 38 82 /r"                   , "X86 VOLATILE PRIVILEGE=L0 I486"],
-    ["invpcid"          , "R:r64, R:m128"                            , "RM"      , "66 0F 38 82 /r"                   , "X64 VOLATILE PRIVILEGE=L0 I486"],
-    ["lar"              , "W:r16, R:r16/m16"                         , "RM"      , "66 0F 02 /r"                      , "ANY VOLATILE ZF=W"],
-    ["lar"              , "W:r32, R:r32/m16"                         , "RM"      , "0F 02 /r"                         , "ANY VOLATILE ZF=W"],
-    ["lgdt"             , "R:mem"                                    , "M"       , "0F 01 /2"                         , "ANY VOLATILE PRIVILEGE=L0"],
-    ["lidt"             , "R:mem"                                    , "M"       , "0F 01 /3"                         , "ANY VOLATILE PRIVILEGE=L0"],
-    ["lldt"             , "R:r16/m16"                                , "M"       , "66 0F 00 /2"                      , "ANY VOLATILE PRIVILEGE=L0"],
-    ["lldt"             , "R:r32/m16"                                , "M"       , "0F 00 /2"                         , "ANY VOLATILE PRIVILEGE=L0"],
-    ["lldt"             , "R:r64/m16"                                , "M"       , "REX.W 0F 00 /2"                   , "X64 VOLATILE PRIVILEGE=L0"],
-    ["lmsw"             , "R:r16/m16"                                , "M"       , "66 0F 01 /6"                      , "ANY VOLATILE PRIVILEGE=L0"],
-    ["lmsw"             , "R:r32/m16"                                , "M"       , "0F 01 /6"                         , "ANY VOLATILE PRIVILEGE=L0"],
-    ["lmsw"             , "R:r64/m16"                                , "M"       , "REX.W 0F 01 /6"                   , "X64 VOLATILE PRIVILEGE=L0"],
-    ["lsl"              , "W:r16, R:r16/m16"                         , "RM"      , "66 0F 03 /r"                      , "ANY VOLATILE ZF=W"],
-    ["lsl"              , "W:r32, R:r32/m16"                         , "RM"      , "0F 03 /r"                         , "ANY VOLATILE ZF=W"],
-    ["lsl"              , "W:r64, R:r32/m16"                         , "RM"      , "REX.W 0F 03 /r"                   , "X64 VOLATILE ZF=W"],
-    ["ltr"              , "R:r16/m16"                                , "M"       , "66 0F 00 /3"                      , "ANY VOLATILE PRIVILEGE=L0"],
-    ["ltr"              , "R:r32/m16"                                , "M"       , "0F 00 /3"                         , "ANY VOLATILE PRIVILEGE=L0"],
-    ["ltr"              , "R:r64/m16"                                , "M"       , "REX.W 0F 00 /3"                   , "X64 VOLATILE PRIVILEGE=L0"],
-    ["monitor"          , "R:<ds:zax>, R:<ecx>, R:<edx>"             , "NONE"    , "0F 01 C8"                         , "ANY VOLATILE PRIVILEGE=L0 MONITOR"],
-    ["mwait"            , "R:<eax>, R:<ecx>"                         , "NONE"    , "0F 01 C9"                         , "ANY VOLATILE PRIVILEGE=L0 MONITOR"],
-    ["rdmsr"            , "W:<edx>,W:<eax>,R:<ecx>"                  , "NONE"    , "0F 32"                            , "ANY VOLATILE PRIVILEGE=L0 MSR=R"],
-    ["rdpmc"            , "W:<edx>,W:<eax>,R:<ecx>"                  , "NONE"    , "0F 33"                            , "ANY VOLATILE PRIVILEGE=L0"],
-    ["sgdt"             , "W:mem"                                    , "M"       , "0F 01 /0"                         , "ANY VOLATILE"],
-    ["sidt"             , "W:mem"                                    , "M"       , "0F 01 /1"                         , "ANY VOLATILE"],
-    ["sldt"             , "W:r16/m16"                                , "M"       , "66 0F 00 /0"                      , "ANY VOLATILE"],
-    ["sldt"             , "W:r32/m16"                                , "M"       , "0F 00 /0"                         , "ANY VOLATILE"],
-    ["sldt"             , "W:r64/m16"                                , "M"       , "REX.W 0F 00 /0"                   , "X64 VOLATILE"],
-    ["smsw"             , "W:r16/m16"                                , "M"       , "66 0F 01 /4"                      , "ANY VOLATILE"],
-    ["smsw"             , "W:r32/m16"                                , "M"       , "0F 01 /4"                         , "ANY VOLATILE"],
-    ["smsw"             , "W:r64/m16"                                , "M"       , "REX.W 0F 01 /4"                   , "X64 VOLATILE"],
-    ["str"              , "W:r16/m16"                                , "M"       , "66 0F 00 /1"                      , "ANY VOLATILE"],
-    ["str"              , "W:r32/m16"                                , "M"       , "0F 00 /1"                         , "ANY VOLATILE"],
-    ["str"              , "W:r64/m16"                                , "M"       , "REX.W 0F 00 /1"                   , "X64 VOLATILE"],
-    ["verr"             , "R:r16/m16"                                , "M"       , "66 0F 00 /4"                      , "ANY VOLATILE ZF=W"],
-    ["verr"             , "R:r32/m16"                                , "M"       , "0F 00 /4"                         , "ANY VOLATILE ZF=W"],
-    ["verr"             , "R:r64/m16"                                , "M"       , "REX.W 0F 00 /4"                   , "X64 VOLATILE ZF=W"],
-    ["verw"             , "R:r16/m16"                                , "M"       , "66 0F 00 /5"                      , "ANY VOLATILE ZF=W"],
-    ["verw"             , "R:r32/m16"                                , "M"       , "0F 00 /5"                         , "ANY VOLATILE ZF=W"],
-    ["verw"             , "R:r64/m16"                                , "M"       , "REX.W 0F 00 /5"                   , "X64 VOLATILE ZF=W"],
-    ["wbinvd"           , ""                                         , "NONE"    , "0F 09"                            , "ANY VOLATILE PRIVILEGE=L0"],
-    ["wrmsr"            , "R:<edx>,R:<eax>,R:<ecx>"                  , "NONE"    , "0F 30"                            , "ANY VOLATILE PRIVILEGE=L0 MSR=W"],
+    ["xsetbv"           , "R:<edx>, R:<eax>, R:<ecx>"                , "NONE"    , "0F 01 D1"                         , "ANY VOLATILE XSAVE XCR=W PRIVILEGE=L0"],
+
+    ["xtest"            , ""                                         , "NONE"    , "0F 01 D6"                         , "ANY VOLATILE TSX OF=0 SF=0 ZF=W AF=0 PF=0 CF=0"],
 
     ["f2xm1"            , ""                                         , "NONE"    , "D9 F0"                            , "ANY FPU        C0=U C1=W C2=U C3=U"],
     ["fabs"             , ""                                         , "NONE"    , "D9 E1"                            , "ANY FPU        C0=U C1=0 C2=U C3=U"],
@@ -1322,11 +1378,6 @@ $export[$as] =
     ["fxtract"          , ""                                         , "NONE"    , "D9 F4"                            , "ANY FPU_PUSH   C0=U C1=W C2=U C3=U"],
     ["fyl2x"            , ""                                         , "NONE"    , "D9 F1"                            , "ANY FPU_POP    C0=U C1=W C2=U C3=U"],
     ["fyl2xp1"          , ""                                         , "NONE"    , "D9 F9"                            , "ANY FPU_POP    C0=U C1=W C2=U C3=U"],
-
-    ["fxrstor"          , "R:mem"                                    , "NONE"    , "0F AE /1"                         , "ANY VOLATILE FXSR C0=W C1=W C2=W C3=W"],
-    ["fxrstor64"        , "R:mem"                                    , "NONE"    , "REX.W 0F AE /1"                   , "X64 VOLATILE FXSR C0=W C1=W C2=W C3=W"],
-    ["fxsave"           , "W:mem"                                    , "NONE"    , "0F AE /0"                         , "ANY VOLATILE FXSR"],
-    ["fxsave64"         , "W:mem"                                    , "NONE"    , "REX.W 0F AE /0"                   , "X64 VOLATILE FXSR"],
 
     ["adcx"             , "X:r32, r32/m32"                           , "RM"      , "66 0F 38 F6 /r"                   , "ANY ADX CF=X"],
     ["adcx"             , "X:r64, r64/m64"                           , "RM"      , "REX.W 66 0F 38 F6 /r"             , "X64 ADX CF=X"],
