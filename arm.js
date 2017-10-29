@@ -187,7 +187,7 @@ function splitOpcodeFields(s) {
 // ============================================================================
 
 // ARM operand.
-class Operand extends base.BaseOperand {
+class Operand extends base.Operand {
   constructor(def) {
     super(def);
 
@@ -196,13 +196,20 @@ class Operand extends base.BaseOperand {
     this.sign = false;         // Operand (Immediate, Register, Memory) has a separate sign (+/-).
 
     var s = def;
-    // Parse {}, which makes the operand optional.
+
+    // Handle optional {}, which makes the operand optional.
     if (s.startsWith("{") && s.endsWith("}")) {
       this.optional = true;
       s = s.substring(1, s.length - 1);
     }
 
-    // Parse shift operation.
+    // Handle commutativity <-> symbol.
+    if (/^\u2194/.test(s)) {
+      this.commutative = true;
+      s = s.substr(1);
+    }
+
+    // Handle shift operation.
     var shiftOp = Utils.parseShiftOp(s);
     if (shiftOp) {
       this.shiftOp = shiftOp;
@@ -266,8 +273,7 @@ class Operand extends base.BaseOperand {
       case "mem": return this.mem;
       case "imm": return this.imm;
       case "rel": return this.rel;
-      default:
-        return "";
+      default   : return "";
     }
   }
 
@@ -285,7 +291,7 @@ arm.Operand = Operand;
 // ============================================================================
 
 // ARM instruction.
-class Instruction extends base.BaseInstruction {
+class Instruction extends base.Instruction {
   constructor(db, name, operands, encoding, opcode, metadata) {
     super(db);
 
@@ -301,6 +307,8 @@ class Instruction extends base.BaseInstruction {
     this._assignEncoding(encoding);
     this._assignOpcode(opcode);
     this._assignMetadata(metadata);
+
+    this._updateOperandsInfo();
     this._postProcess();
   }
 
@@ -320,10 +328,7 @@ class Instruction extends base.BaseInstruction {
     // Split into individual operands and push them to `operands`.
     const arr = base.Parsing.splitOperands(s);
     for (var i = 0; i < arr.length; i++) {
-      const opstr = arr[i].trim();
-      const operand = new Operand(opstr);
-
-      this.operands.push(operand);
+      this.operands.push(new Operand(arr[i].trim()));
     }
   }
 
@@ -551,7 +556,7 @@ arm.Instruction = Instruction;
 // [asmdb.arm.ISA]
 // ============================================================================
 
-class ISA extends base.BaseISA {
+class ISA extends base.ISA {
   constructor(args) {
     super(args);
 

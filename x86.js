@@ -11,10 +11,6 @@ const x86 = $export[$as] = {};
 const base = $export.base ? $export.base : require("./base.js");
 const x86data = $export.x86data ? $export.x86data : require("./x86data.js");
 
-const BaseISA = base.BaseISA;
-const BaseOperand = base.BaseOperand;
-const BaseInstruction = base.BaseInstruction;
-
 const hasOwn = Object.prototype.hasOwnProperty;
 
 // Creates an Object without a prototype (used as a map).
@@ -139,9 +135,9 @@ x86.Utils = Utils;
 // ============================================================================
 
 // X86/X64 operand.
-class Operand extends BaseOperand {
-  constructor(def, defaultAccess) {
-    super(def);
+class Operand extends base.Operand {
+  constructor(data, defaultAccess) {
+    super(data);
 
     this.reg = "";             // Register operand's definition.
     this.regType = "";         // Register operand's type.
@@ -165,29 +161,23 @@ class Operand extends BaseOperand {
     this.rwxWidth = -1;        // Read/Write (RWX) width.
 
     const type = [];
-    var s = def;
+    var s = data;
 
-    // Handle RWX decorators prefix in "R|W|X[A:B]:" format.
-    const mAccess = /^(R|W|X)(\[(\d+)\:(\d+)\])?\:/.exec(s);
+    // Handle RWX decorators prefix "[RWwXx]:".
+    const mAccess = /^([RWwXx])\:/.exec(s);
     if (mAccess) {
-      // RWX:
       this.setAccess(mAccess[1]);
-
-      // RWX[A:B]:
-      if (mAccess[2] !== undefined) {
-        var a = parseInt(mAccess[3], 10);
-        var b = parseInt(mAccess[4], 10);
-
-        this.rwxIndex = Math.min(a, b);
-        this.rwxWidth = Math.abs(a - b) + 1;
-      }
-
-      // Remove RWX information from the operand's string.
       s = s.substr(mAccess[0].length);
     }
 
+    // Handle commutativity <-> symbol.
+    if (/^\u2194/.test(s)) {
+      this.commutative = true;
+      s = s.substr(1);
+    }
+
     // Handle AVX-512 broadcast possibility specified as "/bN" suffix.
-    var mBcst = /\/b(\d+)/.exec(s);
+    const mBcst = /\/b(\d+)/.exec(s);
     if (mBcst) {
       this.bcstSize = parseInt(mBcst[1], 10);
 
@@ -205,8 +195,28 @@ class Operand extends BaseOperand {
 
     // Support multiple operands separated by "/" (only used by r/m and i/u).
     var ops = s.split("/");
+    var oArr = [];
+
     for (var i = 0; i < ops.length; i++) {
-      var op = ops[i].trim();
+      var origOp = ops[i].trim();
+      var op = origOp;
+
+      // Handle range suffix [A] or [A:B]:
+      const mRange = /\[(\d+)\s*(?:\:\s*(\d+)\s*)?\]$/.exec(op);
+      if (mRange) {
+        var a = parseInt(mRange[1], 10);
+        var b = parseInt(mRange[2] || String(a), 10);
+
+        if (a < b)
+          fail(`Operand '${origOp}' contains invalid range '[${a}:${b}]'`)
+
+        this.rwxIndex = b;
+        this.rwxWidth = a - b + 1;
+
+        op = op.substr(0, op.length - mRange[0].length);
+      }
+
+      oArr.push(op);
 
       // Handle a segment specification if this is an implicit register performing
       // memory access.
@@ -280,21 +290,23 @@ class Operand extends BaseOperand {
         continue;
       }
 
-      fail(`Unhandled operand '${op}'`);
+      fail(`Operand '${origOp}' unhandled`);
     }
 
     // In case the data has been modified it's always better to use the stripped off
     // version as we have already processed and stored all the possible decorators.
-    this.data = s;
+    this.data = oArr.join("/");
     this.type = type.join("/");
 
     if (!mAccess && this.isRegOrMem())
       this.setAccess(defaultAccess);
   }
 
-  setAccess(access) {
-    this.read  = access === "R" || access === "X";
-    this.write = access === "W" || access === "X";
+  setAccess(x) {
+    const u = x.toUpperCase();
+    this.zext  = x === "W" || x === "X";
+    this.read  = u === "R" || u === "X";
+    this.write = u === "W" || u === "X";
     return this;
   }
 
@@ -308,6 +320,14 @@ class Operand extends BaseOperand {
 
   isRegOrMem() { return !!this.reg || !!this.mem; }
   isRegAndMem() { return !!this.reg && !!this.mem; }
+
+  isPartialOp() {
+    const maybePartial = this.regType === "r8"   ||
+                         this.regType === "r8hi" ||
+                         this.regType === "r16"  ||
+                         this.regType === "xmm";
+    return maybePartial && !this.zext;
+  }
 
   toRegMem() {
     if (this.reg && this.mem)
@@ -329,7 +349,7 @@ x86.Operand = Operand;
 // ============================================================================
 
 // X86/X64 instruction.
-class Instruction extends BaseInstruction {
+class Instruction extends base.Instruction {
   constructor(db, name, operands, encoding, opcode, metadata) {
     super(db);
 
@@ -371,6 +391,8 @@ class Instruction extends BaseInstruction {
     this._assignEncoding(encoding);
     this._assignOpcode(opcode);
     this._assignMetadata(metadata);
+
+    this._updateOperandsInfo();
     this._postProcess();
   }
 
@@ -386,7 +408,7 @@ class Instruction extends BaseInstruction {
       if (a === -1 || b === -1)
         break;
 
-      // Get the `flag` and remove from `s`.
+      // Get the `flag` and remove it from `s`.
       this._assignAttribute(s.substring(a + 1, b), true);
       s = s.substr(0, a) + s.substr(b + 1);
     }
@@ -394,28 +416,7 @@ class Instruction extends BaseInstruction {
     // Split into individual operands and push them to `operands`.
     const arr = Utils.splitOperands(s);
     for (var i = 0; i < arr.length; i++) {
-      const opstr = arr[i];
-      const operand = new Operand(opstr, i === 0 ? "X" : "R");
-
-      // Propagate broadcast.
-      if (operand.bcstSize > 0)
-        this._assignAttribute("broadcast", operand.bcstSize);
-
-      // Propagate implicit operand.
-      if (operand.implicit)
-        this.implicit = true;
-
-      // Propagate VSIB.
-      if (operand.vsibReg) {
-        if (this.vsibReg) {
-          this.report("Only one operand can be a vector memory address (vmNNx)");
-        }
-
-        this.vsibReg = operand.vsibReg;
-        this.vsibSize = operand.vsibSize;
-      }
-
-      this.operands.push(operand);
+      this.operands.push(new Operand(arr[i].trim(), i === 0 ? "X" : "R"));
     }
   }
 
@@ -675,6 +676,28 @@ class Instruction extends BaseInstruction {
     return false;
   }
 
+  _updateOperandsInfo() {
+    super._updateOperandsInfo();
+
+    for (var i = 0; i < this.operands.length; i++) {
+      const op = this.operands[i];
+
+      // Propagate broadcast.
+      if (op.bcstSize > 0)
+        this._assignAttribute("broadcast", op.bcstSize);
+
+      // Propagate VSIB.
+      if (op.vsibReg) {
+        if (this.vsibReg) {
+          this.report("Only one operand can be a vector memory address (vmNNx)");
+        }
+
+        this.vsibReg = op.vsibReg;
+        this.vsibSize = op.vsibSize;
+      }
+    }
+  }
+
   // Validate the instruction's definition. Common mistakes can be checked and
   // reported easily, however, if the mistake is just an invalid opcode or
   // something else it's impossible to detect.
@@ -787,7 +810,7 @@ x86.Instruction = Instruction;
 
 // X86/X64 instruction database - stores Instruction instances in a map and
 // aggregates all instructions with the same name.
-class ISA extends BaseISA {
+class ISA extends base.ISA {
   constructor(args) {
     super(args);
 

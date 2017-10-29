@@ -18,7 +18,6 @@ function fail(msg) { throw new Error("[BASE] " + msg); }
 
 // Replaces default arguments object (if not provided).
 const NoObject = Object.freeze(Object.create(null));
-const NoArray = Object.freeze([]);
 
 // Indexes used by instruction-data.
 const kIndexName     = 0;
@@ -99,39 +98,41 @@ class Parsing {
 base.Parsing = Parsing;
 
 // ============================================================================
-// [asmdb.base.BaseOperand]
+// [asmdb.base.Operand]
 // ============================================================================
 
-class BaseOperand {
-  constructor(def) {
-    this.type     = "";        // Type of the operand ("reg", "mem", "reg/mem", "imm", "rel").
-    this.data     = def;       // The operand's data (possibly processed).
-    this.optional = false;     // Operand is {optional} (only immediates, zero in such case).
-    this.implicit = false;     // True if the operand is implicit.
-    this.restrict = "";        // Operand is restricted (specific register or immediate value).
-    this.read     = false;     // True if the operand is a read-op from reg/mem.
-    this.write    = false;     // True if the operand is a write-op to reg/mem.
+class Operand {
+  constructor(data) {
+    this.type        = "";       // Type of the operand ("reg", "reg-list", "mem", "reg/mem", "imm", "rel").
+    this.data        = data;     // The operand's data (possibly processed).
+    this.optional    = false;    // Operand is {optional} (only immediates, zero in such case).
+    this.implicit    = false;    // True if the operand is implicit.
+    this.restrict    = "";       // Operand is restricted (specific register or immediate value).
+    this.zext        = false;    // True if the register would be zero extended outside the write operation.
+    this.read        = false;    // True if the operand is a read-op from reg/mem.
+    this.write       = false;    // True if the operand is a write-op to reg/mem.
+    this.commutative = false;    // True if the operand is commutative.
   }
 
   isReg() { return this.type === "reg" || this.type === "reg/mem"; }
   isMem() { return this.type === "mem" || this.type === "reg/mem"; }
   isImm() { return this.type === "imm"; }
   isRel() { return this.type === "rel"; }
-
   isRegMem() { return this.type === "reg/mem"; }
   isRegList() { return this.type === "reg-list" }
+  isPartialOp() { return false; }
 
   toString() { return this.data; }
 }
-base.BaseOperand = BaseOperand;
+base.Operand = Operand;
 
 // ============================================================================
-// [asmdb.base.BaseInstruction]
+// [asmdb.base.Instruction]
 // ============================================================================
 
 // Defines interface and properties that each architecture dependent instruction
 // must provide even if that particular architecture doesn't use that feature(s).
-class BaseInstruction {
+class Instruction {
   constructor(db) {
     Object.defineProperty(this, "db", { value: db });
 
@@ -139,12 +140,15 @@ class BaseInstruction {
     this.arch = "ANY";         // Architecture.
     this.encoding = "";        // Encoding type.
 
-    this.implicit = false;     // Uses implicit operands (registers / memory).
-    this.privilege = "";       // Privilege required to execute the instruction.
+    this.implicit = 0;         // Indexes of all implicit operands (registers / memory).
+    this.commutative = 0;      // Indexes of all commutative operands.
+
+    this.privilege = "";       // Privilege-level required to execute the instruction.
 
     this.opcodeString = "";    // Instruction opcode as specified in manual.
     this.opcodeValue = 0;      // Instruction opcode as number (arch dependent).
     this.fields = dict();      // Information about each opcode field (arch dependent).
+    this.operations = dict();  // Operations the instruction performs.
     this.extensions = dict();  // Extensions required by the instruction.
     this.attributes = dict();  // Instruction attributes from metadata & opcode.
     this.specialRegs = dict(); // Information about read/write to special registers.
@@ -187,6 +191,23 @@ class BaseInstruction {
   }
 
   _assignAttribute(key, value) {
+    if (key == "Op") {
+      var arr = null;
+      if (Array.isArray(value))
+        arr = value;
+      else if (typeof value === "string")
+        arr = value.split("|");
+      else
+        return this.report(`Unhandled operation ${key}=${value}`);
+
+      for (var i = 0; i < arr.length; i++) {
+        const op = arr[i].trim();
+        if (op) this.operations[value] = true;
+      }
+
+      return;
+    }
+
     if (this._assignSimpleAttribute(key, value))
       return;
 
@@ -248,6 +269,34 @@ class BaseInstruction {
     return false;
   }
 
+  _updateOperandsInfo() {
+    this.implicit = 0;
+    this.commutative = 0;
+
+    for (var i = 0; i < this.operands.length; i++) {
+      const op = this.operands[i];
+
+      if (op.implicit) this.implicit |= (1 << i);
+      if (op.commutative) this.commutative |= (1 << i);
+    }
+  }
+
+  isAlias() { return !!this.attributes.AliasOf; }
+  isCommutative() { return this.commutative !== 0; }
+
+  hasImplicit() { return this.implicit !== 0; }
+
+  hasAttribute(name, matchValue) {
+    const value = this.attributes[name];
+    if (value === undefined)
+      return false;
+
+    if (matchValue === undefined)
+      return true;
+
+    return value === matchValue;
+  }
+
   report(msg) {
     console.log(`${this}: ${msg}`);
   }
@@ -256,49 +305,68 @@ class BaseInstruction {
     return `${this.name} ${this.operands.join(", ")}`;
   }
 }
-base.BaseInstruction = BaseInstruction;
+base.Instruction = Instruction;
 
 // ============================================================================
-// [asmdb.base.BaseISA]
+// [asmdb.base.InstructionGroup]
 // ============================================================================
 
-class BaseISA {
+// Instruction group is simply array of function that has some additional
+// functionality.
+class InstructionGroup extends Array {
   constructor() {
+    super();
+
+    if (arguments.length === 1) {
+      const a = arguments[0];
+      if (Array.isArray(a)) {
+        for (var i = 0; i < a.length; i++)
+          this.push(a[i]);
+      }
+    }
+  }
+
+  unionCpuFeatures(name) {
+    const result = dict();
+    for (var i = 0; i < this.length; i++) {
+      const inst = this[i];
+      const features = inst.extensions;
+      for (var k in features)
+        result[k] = features[k];
+    }
+    return result;
+  }
+
+  checkAttribute(name, value) {
+    var n = 0;
+    for (var i = 0; i < this.length; i++)
+      n += Number(this[i].hasAttribute(name, value));
+    return n;
+  }
+}
+base.InstructionGroup = InstructionGroup;
+
+const EmptyInstructionGroup = Object.freeze(new InstructionGroup());
+
+// ============================================================================
+// [asmdb.base.ISA]
+// ============================================================================
+
+class ISA {
+  constructor() {
+    this._instructions = null;           // Instruction array (contains all instructions).
+    this._instructionNames = null;       // Instruction names (sorted), regenerated when needed.
+    this._instructionMap = dict();       // Instruction name to `Instruction[]` mapping.
+    this._aliases = dict();              // Instruction aliases.
     this._cpuLevels = dict();            // Architecture versions.
     this._extensions = dict();           // Architecture extensions.
     this._attributes = dict();           // Instruction attributes.
     this._specialRegs = dict();          // Special registers.
     this._shortcuts = dict();            // Shortcuts used by instructions metadata.
-
-    this._instructions = null;           // Instruction array (contains all instructions).
-    this._instructionNames = null;       // Instruction names (sorted), regenerated when needed.
-    this._instructionMap = dict();       // Instruction name to `Instruction[]` mapping.
-
-    // Statistics.
     this.stats = {
-      insts : 0, // Number of all instructions.
-      groups: 0  // Number of grouped instructions (having unique name).
+      insts : 0,                         // Number of all instructions.
+      groups: 0                          // Number of grouped instructions (having unique name).
     };
-  }
-
-  get cpuLevels() {
-    return this._cpuLevels;
-  }
-
-  get extensions() {
-    return this._extensions;
-  }
-
-  get attributes() {
-    return this._attributes;
-  }
-
-  get specialRegs() {
-    return this._specialRegs;
-  }
-
-  get shortcuts() {
-    return this._shortcuts;
   }
 
   get instructions() {
@@ -324,9 +392,13 @@ class BaseISA {
     return names;
   }
 
-  get instructionMap() {
-    return this._instructionMap;
-  }
+  get instructionMap() { return this._instructionMap; }
+  get aliases() { return this._aliases; }
+  get cpuLevels() { return this._cpuLevels; }
+  get extensions() { return this._extensions; }
+  get attributes() { return this._attributes; }
+  get specialRegs() { return this._specialRegs; }
+  get shortcuts() { return this._shortcuts; }
 
   query(args, copy) {
     if (typeof args !== "object" || !args || Array.isArray(args))
@@ -344,7 +416,7 @@ class BaseISA {
   }
 
   _queryByName(name, copy) {
-    var result = NoArray;
+    var result = EmptyInstructionGroup;
     const map = this._instructionMap;
 
     if (typeof name === "string") {
@@ -359,7 +431,9 @@ class BaseISA {
         const insts = map[names[i]];
         if (!insts) continue;
 
-        if (result === NoArray) result = [];
+        if (result === EmptyInstructionGroup)
+          result = new InstructionGroup();
+
         for (var j = 0; j < insts.length; j++)
           result.push(insts[j]);
       }
@@ -495,9 +569,10 @@ class BaseISA {
       const names = tuple[kIndexName].split("/");
 
       for (var j = 0; j < names.length; j++) {
-        this._addInstruction(
-          this._createInstruction(
-            names[j], tuple[kIndexOperands], tuple[kIndexEncoding], tuple[kIndexOpcode], tuple[kIndexMetadata]));
+        const inst = this._createInstruction(names[j], tuple[kIndexOperands], tuple[kIndexEncoding], tuple[kIndexOpcode], tuple[kIndexMetadata]);
+        if (j > 0)
+          inst.attributes.AliasOf = names[0];
+        this._addInstruction(inst);
       }
     }
 
@@ -511,10 +586,14 @@ class BaseISA {
       group = this._instructionMap[inst.name];
     }
     else {
-      group = this._instructionMap[inst.name] = [];
+      group = new InstructionGroup();
       this._instructionNames = null;
+      this._instructionMap[inst.name] = group;
       this.stats.groups++;
     }
+
+    if (inst.attributes.AliasOf)
+      this._aliases[inst.name] = inst.attributes.AliasOf;
 
     group.push(inst);
     this.stats.insts++;
@@ -527,7 +606,7 @@ class BaseISA {
     fail("Abstract method called");
   }
 }
-base.BaseISA = BaseISA;
+base.ISA = ISA;
 
 }).apply(this, typeof module === "object" && module && module.exports
   ? [module, "exports"] : [this.asmdb || (this.asmdb = {}), "base"]);
