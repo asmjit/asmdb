@@ -38,8 +38,8 @@
 //               register implicitly, but it still must be specified by the user. Some
 //               assemblers and disassemblers may omit it though.
 //
-//     "<reg>" - Implicit register. This data is used mostly by AsmJit's explicit
-//               syntax that is used by X86Compiler and also recognized by X86Assembler.
+//     "<reg>" - Implicit register. This data is used mostly by AsmJit's explicit syntax
+//               that is used by x86::Compiler and also recognized by x86::Assembler.
 //
 // Read/Write Information:
 //
@@ -1097,12 +1097,8 @@ $export[$as] =
 
     ["ud2"              , ""                                            , "NONE"    , "0F 0B"                            , "ANY"],
 
-    ["verr"             , "R:r16/m16"                                   , "M"       , "66 0F 00 /4"                      , "ANY Volatile     ZF=W"],
-    ["verr"             , "R:r32/m16"                                   , "M"       , "0F 00 /4"                         , "ANY Volatile     ZF=W"],
-    ["verr"             , "R:r64/m16"                                   , "M"       , "REX.W 0F 00 /4"                   , "X64 Volatile     ZF=W"],
-    ["verw"             , "R:r16/m16"                                   , "M"       , "66 0F 00 /5"                      , "ANY Volatile     ZF=W"],
-    ["verw"             , "R:r32/m16"                                   , "M"       , "0F 00 /5"                         , "ANY Volatile     ZF=W"],
-    ["verw"             , "R:r64/m16"                                   , "M"       , "REX.W 0F 00 /5"                   , "X64 Volatile     ZF=W"],
+    ["verr"             , "R:r16/m16"                                   , "M"       , "0F 00 /4"                         , "ANY Volatile     ZF=W"],
+    ["verw"             , "R:r16/m16"                                   , "M"       , "0F 00 /5"                         , "ANY Volatile     ZF=W"],
 
     ["wrfsbase"         , "R:r32"                                       , "M"       , "F3 0F AE /2"                      , "FSGSBASE X64     Volatile"],
     ["wrfsbase"         , "R:r64"                                       , "M"       , "REX.W F3 0F AE /2"                , "FSGSBASE X64     Volatile"],
@@ -1179,15 +1175,9 @@ $export[$as] =
     ["invpcid"          , "R:r64, R:m128"                               , "RM"      , "66 0F 38 82 /r"                   , "I486 X64         Volatile PRIVILEGE=L0"],
     ["lgdt"             , "R:mem"                                       , "M"       , "0F 01 /2"                         , "ANY              Volatile PRIVILEGE=L0"],
     ["lidt"             , "R:mem"                                       , "M"       , "0F 01 /3"                         , "ANY              Volatile PRIVILEGE=L0"],
-    ["lldt"             , "R:r16/m16"                                   , "M"       , "66 0F 00 /2"                      , "ANY              Volatile PRIVILEGE=L0"],
-    ["lldt"             , "R:r32/m16"                                   , "M"       , "0F 00 /2"                         , "ANY              Volatile PRIVILEGE=L0"],
-    ["lldt"             , "R:r64/m16"                                   , "M"       , "REX.W 0F 00 /2"                   , "X64              Volatile PRIVILEGE=L0"],
-    ["lmsw"             , "R:r16/m16"                                   , "M"       , "66 0F 01 /6"                      , "ANY              Volatile PRIVILEGE=L0"],
-    ["lmsw"             , "R:r32/m16"                                   , "M"       , "0F 01 /6"                         , "ANY              Volatile PRIVILEGE=L0"],
-    ["lmsw"             , "R:r64/m16"                                   , "M"       , "REX.W 0F 01 /6"                   , "X64              Volatile PRIVILEGE=L0"],
-    ["ltr"              , "R:r16/m16"                                   , "M"       , "66 0F 00 /3"                      , "ANY              Volatile PRIVILEGE=L0"],
-    ["ltr"              , "R:r32/m16"                                   , "M"       , "0F 00 /3"                         , "ANY              Volatile PRIVILEGE=L0"],
-    ["ltr"              , "R:r64/m16"                                   , "M"       , "REX.W 0F 00 /3"                   , "X64              Volatile PRIVILEGE=L0"],
+    ["lldt"             , "R:r16/m16"                                   , "M"       , "0F 00 /2"                         , "ANY              Volatile PRIVILEGE=L0"],
+    ["lmsw"             , "R:r16/m16"                                   , "M"       , "0F 01 /6"                         , "ANY              Volatile PRIVILEGE=L0"],
+    ["ltr"              , "R:r16/m16"                                   , "M"       , "0F 00 /3"                         , "ANY              Volatile PRIVILEGE=L0"],
     ["monitor"          , "R:<ds:zax>, R:<ecx>, R:<edx>"                , "NONE"    , "0F 01 C8"                         , "MONITOR          Volatile PRIVILEGE=L0"],
     ["monitorx"         , "R:<ds:zax>, R:<ecx>, R:<edx>"                , "NONE"    , "0F 01 FA"                         , "MONITORX         Volatile"],
     ["mwait"            , "R:<eax>, R:<ecx>"                            , "NONE"    , "0F 01 C9"                         , "MONITOR          Volatile PRIVILEGE=L0"],
