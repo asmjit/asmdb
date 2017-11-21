@@ -3464,7 +3464,7 @@ $export[$as] =
     ["vpbroadcastb"     , "W:ymm {kz}, xmm[0]/m8"                       , "RM-T1S"  , "EVEX.256.66.0F38.W0 78 /r"        , "AVX512_BW-VL"],
     ["vpbroadcastb"     , "W:zmm {kz}, r32[0]"                          , "RM-T1S"  , "EVEX.512.66.0F38.W0 7A /r"        , "AVX512_BW"],
     ["vpbroadcastb"     , "W:zmm {kz}, r64[0]"                          , "RM-T1S"  , "EVEX.512.66.0F38.W0 7A /r"        , "AVX512_BW X64"],
-    ["vpbroadcastb"     , "W:zmm {kz}, xmm/m8"                          , "RM-T1S"  , "EVEX.512.66.0F38.W0 78 /r"        , "AVX512_BW"],
+    ["vpbroadcastb"     , "W:zmm {kz}, xmm[0]/m8"                       , "RM-T1S"  , "EVEX.512.66.0F38.W0 78 /r"        , "AVX512_BW"],
     ["vpbroadcastd"     , "W:xmm {kz}, r32[3:0]"                        , "RM-T1S"  , "EVEX.128.66.0F38.W0 7C /r"        , "AVX512_F-VL"],
     ["vpbroadcastd"     , "W:xmm {kz}, r64[3:0]"                        , "RM-T1S"  , "EVEX.128.66.0F38.W0 7C /r"        , "AVX512_F-VL X64"],
     ["vpbroadcastd"     , "W:xmm {kz}, xmm[3:0]/m32"                    , "RM-T1S"  , "EVEX.128.66.0F38.W0 58 /r"        , "AVX512_F-VL"],
