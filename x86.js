@@ -4,23 +4,26 @@
 // [License]
 // Public Domain.
 
-(function($export, $as) {
+(function($scope, $as) {
 "use strict";
 
-const x86 = $export[$as] = {};
-const base = $export.base ? $export.base : require("./base.js");
-const x86data = $export.x86data ? $export.x86data : require("./x86data.js");
+function FAIL(msg) { throw new Error("[X86] " + msg); }
+
+// Import.
+const base = $scope.base ? $scope.base : require("./base.js");
+const x86data = $scope.x86data ? $scope.x86data : require("./x86data.js");
 
 const hasOwn = Object.prototype.hasOwnProperty;
+const dict = base.dict;
+const NONE = base.NONE;
+const Parsing = base.Parsing;
 
-// Creates an Object without a prototype (used as a map).
-function dict() { return Object.create(null); }
+// Export.
+const x86 = $scope[$as] = {};
 
-// If something failed...
-function fail(msg) { throw new Error("[X86] " + msg); }
-
-// Replaces default arguments object (if not provided).
-const NoObject = Object.freeze({});
+// ============================================================================
+// [CpuRegs]
+// ============================================================================
 
 // Build an object containing CPU registers as keys mapping them to type, kind, and index.
 function buildCpuRegs(defs) {
@@ -62,10 +65,6 @@ function buildCpuRegs(defs) {
   return map;
 }
 
-// ============================================================================
-// [Constants]
-// ============================================================================
-
 const kCpuRegisters = buildCpuRegs(x86data.registers);
 
 // ============================================================================
@@ -103,29 +102,37 @@ class Utils {
   // if the given string does only represent a register type, but not a specific reg.
   static regIndexOf(s) { return hasOwn.call(kCpuRegisters, s) ? kCpuRegisters[s].index : null; }
 
-  // Get size in bytes of an immediate `s`.
+  // Get size of an immediate `s` [in bits].
   //
   // Handles "ib", "iw", "id", "iq", and also "/is4".
   static immSize(s) {
-    if (s === "1" ) return 8;
-    if (s === "i4" || s === "u4" || s === "/is4") return 4;
-    if (s === "ib" || s === "ub") return 8;
-    if (s === "iw" || s === "uw") return 16;
-    if (s === "id" || s === "ud") return 32;
-    if (s === "iq" || s === "uq") return 64;
-
-    return -1;
+    switch (s) {
+      case "1"     : return 8;
+      case "i4"    :
+      case "u4"    :
+      case "/is4"  : return 4;
+      case "ib"    :
+      case "ub"    : return 8;
+      case "iw"    :
+      case "uw"    : return 16;
+      case "id"    :
+      case "ud"    : return 32;
+      case "iq"    :
+      case "uq"    : return 64;
+      case "p16_16": return 32;
+      case "p16_32": return 48;
+      default      : return -1;
+    }
   }
 
-  // Get size in bytes of a relative displacement.
-  //
-  // Handles "rel8" and "rel32".
+  // Get size of a relative displacement [in bits].
   static relSize(s) {
-    if (s === "rel8") return 8;
-    if (s === "rel16") return 16;
-    if (s === "rel32") return 32;
-
-    return -1;
+    switch (s) {
+      case "rel8"  : return 8;
+      case "rel16" : return 16;
+      case "rel32" : return 32;
+      default      : return -1;
+    }
   }
 }
 x86.Utils = Utils;
@@ -170,10 +177,10 @@ class Operand extends base.Operand {
       s = s.substr(mAccess[0].length);
     }
 
-    // Handle commutativity <-> symbol.
-    if (/^\u2194/.test(s)) {
+    // Handle commutativity attribute.
+    if (Parsing.isCommutative(s)) {
       this.commutative = true;
-      s = s.substr(1);
+      s = Parsing.clearCommutative(s);
     }
 
     // Handle AVX-512 broadcast possibility specified as "/bN" suffix.
@@ -181,16 +188,14 @@ class Operand extends base.Operand {
     if (mBcst) {
       this.bcstSize = parseInt(mBcst[1], 10);
 
-      // Remove broadcast from the operand's definition; it's not needed anymore.
+      // Remove the broadcast attribute from the definition; it's not needed anymore.
       s = s.substr(0, mBcst.index) + s.substr(mBcst.index + mBcst[0].length);
     }
 
-    // Handle an implicit operand.
-    if (s.charAt(0) === "<" && s.charAt(s.length - 1) === ">") {
+    // Handle <implicit> attribute.
+    if (Parsing.isImplicit(s)) {
       this.implicit = true;
-
-      // Remove "<...>" from the operand's definition.
-      s = s.substring(1, s.length - 1);
+      s = Parsing.clearImplicit(s);
     }
 
     // Support multiple operands separated by "/" (only used by r/m and i/u).
@@ -208,7 +213,7 @@ class Operand extends base.Operand {
         var b = parseInt(mRange[2] || String(a), 10);
 
         if (a < b)
-          fail(`Operand '${origOp}' contains invalid range '[${a}:${b}]'`)
+          FAIL(`Operand '${origOp}' contains invalid range '[${a}:${b}]'`)
 
         this.rwxIndex = b;
         this.rwxWidth = a - b + 1;
@@ -263,7 +268,7 @@ class Operand extends base.Operand {
         if (!this.imm)
           this.imm = size;
         else if (this.imm !== size)
-          fail(`Immediate size mismatch: ${this.imm} != ${size}`);
+          FAIL(`Immediate size mismatch: ${this.imm} != ${size}`);
 
         // Sign-extend / zero-extend.
         const sign = op.startsWith("i") ? "signed" : "unsigned";
@@ -290,7 +295,7 @@ class Operand extends base.Operand {
         continue;
       }
 
-      fail(`Operand '${origOp}' unhandled`);
+      FAIL(`Operand '${origOp}' unhandled`);
     }
 
     // In case the data has been modified it's always better to use the stripped off
@@ -368,7 +373,7 @@ class Instruction extends base.Instruction {
     this.rm = "";              // Instruction specific payload "/0..7".
     this.rmInt = -1;           // Instruction specific payload as integer (0-7).
     this.ri = false;           // Instruction opcode is combined with register, "XX+r" or "XX+i".
-    this.rel = 0;              // Displacement (cb cw cd parts).
+    this.rel = 0;              // Displacement ("cb", "cw", and "cd" parts).
 
     this.fpu = false;          // If the instruction is an FPU instruction.
     this.fpuTop = 0;           // FPU top index manipulation [-1, 0, 1, 2].
@@ -461,7 +466,7 @@ class Instruction extends base.Instruction {
         if (/^(?:66|F2|F3)$/.test(comp)) { this.pp = comp; continue; }
 
         // Process `MM` field - 0F/0F3A/0F38/M8/M9.
-        if (/^(?:0F|0F3A|0F38|M8|M9)$/.test(comp)) { this.mm = comp; continue; }
+        if (/^(?:0F|0F3A|0F38|M08|M09|M0A)$/.test(comp)) { this.mm = comp; continue; }
 
         // Process `W` field.
         if (/^WIG|W0|W1$/.test(comp)) { this.w = comp; continue; }
@@ -583,7 +588,8 @@ class Instruction extends base.Instruction {
         // Parse displacement.
         if (/^(?:cb|cw|cd)$/.test(comp) && !this.rel) {
           this.rel = comp === "cb" ? 1 :
-                     comp === "cw" ? 2 : 4;
+                     comp === "cw" ? 2 :
+                     comp === "cd" ? 4 : -1;
           continue;
         }
 
@@ -815,7 +821,7 @@ class ISA extends base.ISA {
     super(args);
 
     if (!args)
-      args = NoObject;
+      args = NONE;
 
     if (args.builtins !== false)
       this.addData(x86data);

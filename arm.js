@@ -4,21 +4,22 @@
 // [License]
 // Public Domain.
 
-(function($export, $as) {
+(function($scope, $as) {
 "use strict";
 
-const arm = $export[$as] = {};
-const base = $export.base ? $export.base : require("./base.js");
-const armdata = $export.armdata ? $export.armdata : require("./armdata.js");
+function FAIL(msg) { throw new Error("[ARM] " + msg); }
 
-// Creates an Object without a prototype (used as a map).
-function dict() { return Object.create(null); }
+// Import.
+const base = $scope.base ? $scope.base : require("./base.js");
+const armdata = $scope.armdata ? $scope.armdata : require("./armdata.js");
 
-// If something failed...
-function fail(msg) { throw new Error("[ARM] " + msg); }
+const hasOwn = Object.prototype.hasOwnProperty;
+const dict = base.dict;
+const NONE = base.NONE;
+const Parsing = base.Parsing;
 
-// Replaces default arguments object (if not provided).
-const NoObject = Object.freeze({});
+// Export.
+const arm = $scope[$as] = dict();
 
 // ============================================================================
 // [asmdb.arm.Utils]
@@ -107,14 +108,14 @@ class Utils {
       if (v.indexOf("-") !== -1) {
         const m = /^([A-Za-z]+)(\d+)-(\d+)$/.exec("r16-32");
         if (!m)
-          fail(`Couldn't parse '${s}' data-type`);
+          FAIL(`Couldn't parse '${s}' data-type`);
 
         var type = m[1];
         var size = parseInt(m[2], 10);
         var last = parseInt(m[3], 10);
 
         if (!Utils.checkDtSize(size) || !Utils.checkDtSize(last))
-          fail(`Invalid dt width in '${s}'`);
+          FAIL(`Invalid dt width in '${s}'`);
 
         do {
           out.push(type + String(size));
@@ -197,16 +198,16 @@ class Operand extends base.Operand {
 
     var s = def;
 
-    // Handle optional {}, which makes the operand optional.
-    if (s.startsWith("{") && s.endsWith("}")) {
+    // Handle {optional} attribute.
+    if (Parsing.isOptional(s)) {
       this.optional = true;
-      s = s.substring(1, s.length - 1);
+      s = Parsing.clearOptional(s);
     }
 
     // Handle commutativity <-> symbol.
-    if (/^\u2194/.test(s)) {
+    if (Parsing.isCommutative(s)) {
       this.commutative = true;
-      s = s.substr(1);
+      s = Parsing.clearCommutative(s);
     }
 
     // Handle shift operation.
@@ -229,7 +230,7 @@ class Operand extends base.Operand {
       }
 
       if (!mem.endsWith("]"))
-        fail(`Unknown memory operand '${mem}' in '${def}'`);
+        FAIL(`Unknown memory operand '${mem}' in '${def}'`);
 
       // --- Setup memory operand ---
       this.type     = "mem";
@@ -254,7 +255,7 @@ class Operand extends base.Operand {
       const info = FieldInfo[reg];
 
       if (!info)
-        fail(`Unknown register operand '${reg}' in '${def}'`);
+        FAIL(`Unknown register operand '${reg}' in '${def}'`);
 
       // --- Setup register or register-list operand ---
       this.type     = info.list ? "reg-list" : "reg";
@@ -365,7 +366,7 @@ class Instruction extends base.Instruction {
           const a = parseInt(m[1], 10);
           const b = parseInt(m[2], 10);
           if (a < b)
-            fail(`Invalid bit range '${key}' in opcode '${s}'`);
+            FAIL(`Invalid bit range '${key}' in opcode '${s}'`);
           size = a - b + 1;
           mask = ((1 << size) - 1) << b;
           key = key.substr(0, m.index).trim();
@@ -386,7 +387,7 @@ class Instruction extends base.Instruction {
 
           if (lbit || hbit) {
             if (lbit && hbit)
-              fail(`Couldn't recognize the format of '${key}' in opcode '${s}'`);
+              FAIL(`Couldn't recognize the format of '${key}' in opcode '${s}'`);
 
             if (lbit) key = key.substring(1);
             if (hbit) key = key.substring(0, key.length - 1);
@@ -404,7 +405,7 @@ class Instruction extends base.Instruction {
             bits = 1;
           }
           else {
-            fail(`Couldn't recognize the size of '${key}' in opcode '${s}'`);
+            FAIL(`Couldn't recognize the size of '${key}' in opcode '${s}'`);
           }
 
           if (dup[key_] === true) {
@@ -439,10 +440,10 @@ class Instruction extends base.Instruction {
 
       // There should be either number of bits or mask, there shouldn't be both.
       if (!field.bits && !field.mask)
-        fail(`Part '${key}' of opcode '${s}' contains neither size nor mask`);
+        FAIL(`Part '${key}' of opcode '${s}' contains neither size nor mask`);
 
       if (field.bits && field.mask)
-        fail(`Part '${key}' of opcode '${s}' contains both size and mask`);
+        FAIL(`Part '${key}' of opcode '${s}' contains both size and mask`);
 
       if (field.bits)
         field.mask = ((1 << field.bits) - 1);
@@ -466,7 +467,7 @@ class Instruction extends base.Instruction {
 
     // Check if the opcode value has the correct number of bits (either 16 or 32).
     if (opcodeIndex !== 16 && opcodeIndex !== 32)
-      fail(`The number of bits '${opcodeIndex}' used by the opcode '${s}' doesn't match 16 or 32`);
+      FAIL(`The number of bits '${opcodeIndex}' used by the opcode '${s}' doesn't match 16 or 32`);
     this.opcodeValue = normalizeNumber(opcodeValue);
   }
 
@@ -522,7 +523,7 @@ class Instruction extends base.Instruction {
       this.name = parts[0];
 
       if (parts.length > 3)
-        fail(`Couldn't recognize name attributes of '${s}'`);
+        FAIL(`Couldn't recognize name attributes of '${s}'`);
 
       for (var i = 1; i < parts.length; i++) {
         const dt = Utils.parseDtArray(parts[i]);
@@ -561,7 +562,7 @@ class ISA extends base.ISA {
     super(args);
 
     if (!args)
-      args = NoObject;
+      args = NONE;
 
     if (args.builtins !== false)
       this.addData(armdata);

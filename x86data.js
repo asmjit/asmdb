@@ -31,54 +31,51 @@
 // OPERANDS
 // ========
 //
-// Implicit/Explicit Operand:
-//
-//     "reg"   - Explicit register, must always be part of the instruction. If a fixed
+//   * "op"    - Explicit operand, must always be part of the instruction. If a fixed
 //               register (like "cl") is used, it means that the instruction uses this
-//               register implicitly, but it still must be specified by the user. Some
-//               assemblers and disassemblers may omit it though.
+//               register implicitly, but it must be specified anyway.
 //
-//     "<reg>" - Implicit register. This data is used mostly by AsmJit's explicit syntax
-//               that is used by x86::Compiler and also recognized by x86::Assembler.
+//   * "<op>"  - Implicit operand - some assemblers allow implicit operands the be passed
+//               explicitly for documenting purposes. And some assemblers like AsmJit's
+//               Compiler infrastructure requires implicit operands to be passed explicitly
+//               for register allocation purposes.
 //
-// Read/Write Information:
+//   * "{op}"  - Optional operand. Mostly used by AVX_512:
 //
-//   Each operand can provide metadata that can be used to describe which operands
-//   are used as a destination, and which operands are source-only. Each instruction
-//   in general assumes that the first operand is always read/write and all following
-//   operands are read-only. However, this is not correct for all instructions, thus,
-//   instructions that don't match this assumption must provide additional information:
+//               - {k} mask selector.
+//               - {z} zeroing.
+//               - {1tox} broadcast.
+//               - {er} embedded-rounding.
+//               - {sae} suppress-all-exceptions.
 //
-//     "R:Operand" - The operand is read-only.
-//     "w:Operand" - The operand is write-only (doesn't zero extend, results in partial write).
-//     "W:Operand" - The operand is write-only (implicitly zero-extends outside write operation).
-//     "x:Operand" - The operand is read/write (doesn't zero extend, results in partial write).
-//     "X:Operand" - The operand is read/write (implicitly zero-extends outside write operation).
+//   * "?:Op"  - Each operand can provide metadata that can be used to describe which
+//               operands are used as a destination, and which operands are source-only.
+//               Each instruction in general assumes that the first operand is always
+//               read/write and all following operands are read-only. However, this is
+//               not correct for all instructions, thus, instructions that don't match
+//               this assumption must provide additional information:
 //
-//   In addition, each register can contain an optional byte-index that describes which
-//   bytes are read/write.
+//               - "R:Op" - The operand is read-only.
+//               - "w:Op" - The operand is write-only (does not zero-extend).
+//               - "W:Op" - The operand is write-only (implicit zero-extend).
+//               - "x:Op" - The operand is read/write (does not zero-extend).
+//               - "X:Op" - The operand is read/write (implicit zero-extend).
 //
-//     "Reg[A:B]" - Additional information about the portion of the register to be read,
-//                  written, and/or read and written. A and B are BYTE indexes, not BIT
-//                  indexes as used by Intel Architecture Reference Manual.
+//   * Op[A:B] - Optional byte-index that describes which bytes are read and written.
 //
-// Additional Information:
+//               NOTE: A and B are BYTE indexes, not BIT indexes as used by reference manuals.
 //
-//     "↔Operand" - Operand is commutative with other operands prefixed by "↔". Commutativity
-//                  means that all operands marked by '↔' can be swapped and the result of the
-//                  instruction would be the same.
-
+//   * "↔Op"   - Operand is commutative with other operands prefixed by "↔". Commutativity
+//               means that all operands marked by '↔' can be swapped and the result of the
+//               instruction would be the same.
 
 // WHAT IS MISSING
 // ===============
 //
 // Here is a list of missing instructions to keep track of it:
 //
-// [ ] call (far)
-// [ ] jmp (far)
-// [ ] ret (far)
+// [ ] call/jmp/ret (far)
 // [ ] xlat/xlatb
-// [ ] VMX/SVM/SMX extensions
 
 (function($export, $as) {
 "use strict";
@@ -133,6 +130,7 @@ $export[$as] =
     { "name": "GFNI"             },
     { "name": "I486"             },
     { "name": "LAHFSAHF"         },
+    { "name": "LWP"              },
     { "name": "LZCNT"            },
     { "name": "MMX"              },
     { "name": "MMX2"             },
@@ -152,7 +150,9 @@ $export[$as] =
     { "name": "RDTSCP"           },
     { "name": "RTM"              },
     { "name": "SHA"              },
+    { "name": "SKINIT"           },
     { "name": "SMAP"             },
+    { "name": "SMX"              },
     { "name": "SSE"              },
     { "name": "SSE2"             },
     { "name": "SSE3"             },
@@ -160,6 +160,7 @@ $export[$as] =
     { "name": "SSE4_2"           },
     { "name": "SSE4A"            },
     { "name": "SSSE3"            },
+    { "name": "SVM"              },
     { "name": "TBM"              },
     { "name": "TSX"              },
     { "name": "VAES"             },
@@ -410,9 +411,18 @@ $export[$as] =
     ["bts"              , "X:r32/m32, r32"                              , "MR"      , "0F AB /r"                         , "ANY XLock        OF=U SF=U AF=U PF=U CF=W"],
     ["bts"              , "X:r64/m64, r64"                              , "MR"      , "REX.W 0F AB /r"                   , "X64 XLock        OF=U SF=U AF=U PF=U CF=W"],
 
+    ["call"             , "rel16"                                       , "D"       , "66 E8 cw"                         , "X86              Control=Call OF=U SF=U ZF=U AF=U PF=U CF=U"],
     ["call"             , "rel32"                                       , "D"       , "E8 cd"                            , "ANY              Control=Call OF=U SF=U ZF=U AF=U PF=U CF=U"],
+    ["call"             , "R:r16/m16"                                   , "M"       , "66 FF /2"                         , "X86              Control=Call OF=U SF=U ZF=U AF=U PF=U CF=U"],
     ["call"             , "R:r32/m32"                                   , "M"       , "FF /2"                            , "X86              Control=Call OF=U SF=U ZF=U AF=U PF=U CF=U"],
     ["call"             , "R:r64/m64"                                   , "M"       , "FF /2"                            , "X64              Control=Call OF=U SF=U ZF=U AF=U PF=U CF=U"],
+    /*
+    ["call"             , "R:p16_16"                                    , "D"       , "66 9A id"                         , "X86              Control=Call OF=U SF=U ZF=U AF=U PF=U CF=U"],
+    ["call"             , "R:p16_32"                                    , "D"       , "9A if"                            , "X86              Control=Call OF=U SF=U ZF=U AF=U PF=U CF=U"],
+    */
+    ["call"             , "R:m16_16"                                    , "M"       , "66 FF /3"                         , "ANY              Control=Call OF=U SF=U ZF=U AF=U PF=U CF=U"],
+    ["call"             , "R:m16_32"                                    , "M"       , "FF /3"                            , "ANY              Control=Call OF=U SF=U ZF=U AF=U PF=U CF=U"],
+    ["call"             , "R:m16_64"                                    , "M"       , "REX.W FF /3"                      , "X64              Control=Call OF=U SF=U ZF=U AF=U PF=U CF=U"],
 
     ["cbw"              , "x:<ax>"                                      , "NONE"    , "66 98"                            , "ANY"],
     ["cwde"             , "X:<eax>"                                     , "NONE"    , "98"                               , "ANY"],
@@ -596,21 +606,37 @@ $export[$as] =
     ["jle/jng"          , "rel8"                                        , "D"       , "7E cb"                            , "ANY              Control=Branch ZF=R SF=R OF=R"],
     ["jg/jnle"          , "rel8"                                        , "D"       , "7F cb"                            , "ANY              Control=Branch ZF=R SF=R OF=R"],
 
+    ["jo"               , "rel16"                                       , "D"       , "66 0F 80 cw"                      , "X86              Control=Branch OF=R"],
     ["jo"               , "rel32"                                       , "D"       , "0F 80 cd"                         , "ANY              Control=Branch OF=R"],
+    ["jno"              , "rel16"                                       , "D"       , "66 0F 81 cw"                      , "X86              Control=Branch OF=R"],
     ["jno"              , "rel32"                                       , "D"       , "0F 81 cd"                         , "ANY              Control=Branch OF=R"],
+    ["jb/jnae/jc"       , "rel16"                                       , "D"       , "66 0F 82 cw"                      , "X86              Control=Branch CF=R"],
     ["jb/jnae/jc"       , "rel32"                                       , "D"       , "0F 82 cd"                         , "ANY              Control=Branch CF=R"],
+    ["jae/jnb/jnc"      , "rel16"                                       , "D"       , "66 0F 83 cw"                      , "X86              Control=Branch CF=R"],
     ["jae/jnb/jnc"      , "rel32"                                       , "D"       , "0F 83 cd"                         , "ANY              Control=Branch CF=R"],
+    ["je/jz"            , "rel16"                                       , "D"       , "66 0F 84 cw"                      , "X86              Control=Branch ZF=R"],
     ["je/jz"            , "rel32"                                       , "D"       , "0F 84 cd"                         , "ANY              Control=Branch ZF=R"],
+    ["jne/jnz"          , "rel16"                                       , "D"       , "66 0F 85 cw"                      , "X86              Control=Branch ZF=R"],
     ["jne/jnz"          , "rel32"                                       , "D"       , "0F 85 cd"                         , "ANY              Control=Branch ZF=R"],
+    ["jbe/jna"          , "rel16"                                       , "D"       , "66 0F 86 cw"                      , "X86              Control=Branch CF=R ZF=R"],
     ["jbe/jna"          , "rel32"                                       , "D"       , "0F 86 cd"                         , "ANY              Control=Branch CF=R ZF=R"],
+    ["ja/jnbe"          , "rel16"                                       , "D"       , "66 0F 87 cw"                      , "X86              Control=Branch CF=R ZF=R"],
     ["ja/jnbe"          , "rel32"                                       , "D"       , "0F 87 cd"                         , "ANY              Control=Branch CF=R ZF=R"],
+    ["js"               , "rel16"                                       , "D"       , "66 0F 88 cw"                      , "X86              Control=Branch SF=R"],
     ["js"               , "rel32"                                       , "D"       , "0F 88 cd"                         , "ANY              Control=Branch SF=R"],
+    ["jns"              , "rel16"                                       , "D"       , "66 0F 89 cw"                      , "X86              Control=Branch SF=R"],
     ["jns"              , "rel32"                                       , "D"       , "0F 89 cd"                         , "ANY              Control=Branch SF=R"],
+    ["jp/jpe"           , "rel16"                                       , "D"       , "66 0F 8A cw"                      , "X86              Control=Branch PF=R"],
     ["jp/jpe"           , "rel32"                                       , "D"       , "0F 8A cd"                         , "ANY              Control=Branch PF=R"],
+    ["jnp/jpo"          , "rel16"                                       , "D"       , "66 0F 8B cw"                      , "X86              Control=Branch PF=R"],
     ["jnp/jpo"          , "rel32"                                       , "D"       , "0F 8B cd"                         , "ANY              Control=Branch PF=R"],
+    ["jl/jnge"          , "rel16"                                       , "D"       , "66 0F 8C cw"                      , "X86              Control=Branch SF=R OF=R"],
     ["jl/jnge"          , "rel32"                                       , "D"       , "0F 8C cd"                         , "ANY              Control=Branch SF=R OF=R"],
+    ["jge/jnl"          , "rel16"                                       , "D"       , "66 0F 8D cw"                      , "X86              Control=Branch SF=R OF=R"],
     ["jge/jnl"          , "rel32"                                       , "D"       , "0F 8D cd"                         , "ANY              Control=Branch SF=R OF=R"],
+    ["jle/jng"          , "rel16"                                       , "D"       , "66 0F 8E cw"                      , "X86              Control=Branch ZF=R SF=R OF=R"],
     ["jle/jng"          , "rel32"                                       , "D"       , "0F 8E cd"                         , "ANY              Control=Branch ZF=R SF=R OF=R"],
+    ["jg/jnle"          , "rel16"                                       , "D"       , "66 0F 8F cw"                      , "X86              Control=Branch ZF=R SF=R OF=R"],
     ["jg/jnle"          , "rel32"                                       , "D"       , "0F 8F cd"                         , "ANY              Control=Branch ZF=R SF=R OF=R"],
 
     ["jecxz"            , "R:<cx>, rel8"                                , "D"       , "67 E3 cb"                         , "X86              Control=Branch"],
@@ -619,9 +645,17 @@ $export[$as] =
     ["jecxz"            , "R:<rcx>, rel8"                               , "D"       , "E3 cb"                            , "X64              Control=Branch"],
 
     ["jmp"              , "rel8"                                        , "D"       , "EB cb"                            , "ANY              Control=Jump"],
+    ["jmp"              , "rel16"                                       , "D"       , "66 E9 cw"                         , "X86              Control=Jump"],
     ["jmp"              , "rel32"                                       , "D"       , "E9 cd"                            , "ANY              Control=Jump"],
     ["jmp"              , "R:r32/m32"                                   , "D"       , "FF /4"                            , "X86              Control=Jump"],
     ["jmp"              , "R:r64/m64"                                   , "D"       , "FF /4"                            , "X64              Control=Jump"],
+    /*
+    ["jmp"              , "R:p16_16"                                    , "M"       , "66 EA id"                         , "X86              Control=Jump"],
+    ["jmp"              , "R:p16_32"                                    , "M"       , "EA if"                            , "X86              Control=Jump"],
+    */
+    ["jmp"              , "R:m16_16"                                    , "M"       , "66 FF /5"                         , "ANY              Control=Jump"],
+    ["jmp"              , "R:m16_32"                                    , "M"       , "FF /5"                            , "ANY              Control=Jump"],
+    ["jmp"              , "R:m16_64"                                    , "M"       , "REX.W FF /5"                      , "X64              Control=Jump"],
 
     ["lar"              , "w:r16, R:r16/m16"                            , "RM"      , "66 0F 02 /r"                      , "ANY              Volatile ZF=W"],
     ["lar"              , "W:r32, R:r32/m16"                            , "RM"      , "0F 02 /r"                         , "ANY              Volatile ZF=W"],
@@ -888,6 +922,11 @@ $export[$as] =
 
     ["ret"              , ""                                            , "NONE"    , "C3"                               , "ANY              Control=Return"],
     ["ret"              , "uw"                                          , "I"       , "C2 iw"                            , "ANY              Control=Return"],
+
+    /*
+    ["ret"              , ""                                            , "NONE"    , "CB"                               , "ANY              Control=Return"],
+    ["ret"              , "uw"                                          , "I"       , "CA iw"                            , "ANY              Control=Return"],
+    */
 
     ["rol"              , "x:r8/m8, 1"                                  , "M"       , "D0 /0"                            , "ANY              CF=W OF=W"],
     ["rol"              , "x:r8/m8, cl"                                 , "M"       , "D2 /0"                            , "ANY              CF=W OF=W"],
@@ -1257,25 +1296,6 @@ $export[$as] =
     ["tzcnt"            , "W:r32, r32/m32"                              , "RM"      , "F3 0F BC /r"                      , "BMI              OF=U SF=U ZF=W AF=U PF=U CF=W"],
     ["tzcnt"            , "W:r64, r64/m64"                              , "RM"      , "REX.W F3 0F BC /r"                , "BMI X64          OF=U SF=U ZF=W AF=U PF=U CF=W"],
 
-    ["blci"             , "W:r32, r32/m32"                              , "VM"      , "XOP.NDD.LZ.M9.W0 02 /6"           , "TBM"],
-    ["blci"             , "W:r64, r64/m64"                              , "VM"      , "XOP.NDD.LZ.M9.W1 02 /6"           , "TBM X64"],
-    ["blcic"            , "W:r32, r32/m32"                              , "VM"      , "XOP.NDD.LZ.M9.W0 01 /5"           , "TBM"],
-    ["blcic"            , "W:r64, r64/m64"                              , "VM"      , "XOP.NDD.LZ.M9.W1 01 /5"           , "TBM X64"],
-    ["blsic"            , "W:r32, r32/m32"                              , "VM"      , "XOP.NDD.LZ.M9.W0 01 /6"           , "TBM"],
-    ["blsic"            , "W:r64, r64/m64"                              , "VM"      , "XOP.NDD.LZ.M9.W1 01 /6"           , "TBM X64"],
-    ["blcfill"          , "W:r32, r32/m32"                              , "VM"      , "XOP.NDD.LZ.M9.W0 01 /1"           , "TBM"],
-    ["blcfill"          , "W:r64, r64/m64"                              , "VM"      , "XOP.NDD.LZ.M9.W1 01 /1"           , "TBM X64"],
-    ["blsfill"          , "W:r32, r32/m32"                              , "VM"      , "XOP.NDD.LZ.M9.W0 01 /2"           , "TBM"],
-    ["blsfill"          , "W:r64, r64/m64"                              , "VM"      , "XOP.NDD.LZ.M9.W1 01 /2"           , "TBM X64"],
-    ["blcmsk"           , "W:r32, r32/m32"                              , "VM"      , "XOP.NDD.LZ.M9.W0 02 /1"           , "TBM"],
-    ["blcmsk"           , "W:r64, r64/m64"                              , "VM"      , "XOP.NDD.LZ.M9.W1 02 /1"           , "TBM X64"],
-    ["blcs"             , "W:r32, r32/m32"                              , "VM"      , "XOP.NDD.LZ.M9.W0 01 /3"           , "TBM"],
-    ["blcs"             , "W:r64, r64/m64"                              , "VM"      , "XOP.NDD.LZ.M9.W1 01 /3"           , "TBM X64"],
-    ["tzmsk"            , "W:r32, r32/m32"                              , "VM"      , "XOP.NDD.LZ.M9.W0 01 /4"           , "TBM"],
-    ["tzmsk"            , "W:r64, r64/m64"                              , "VM"      , "XOP.NDD.LZ.M9.W1 01 /4"           , "TBM X64"],
-    ["t1mskc"           , "W:r32, r32/m32"                              , "VM"      , "XOP.NDD.LZ.M9.W0 01 /7"           , "TBM"],
-    ["t1mskc"           , "W:r64, r64/m64"                              , "VM"      , "XOP.NDD.LZ.M9.W1 01 /7"           , "TBM X64"],
-
     ["crc32"            , "X:r32, r8/m8"                                , "RM"      , "F2 0F 38 F0 /r"                   , "SSE4_2"],
     ["crc32"            , "X:r32, r16/m16"                              , "RM"      , "66 F2 0F 38 F1 /r"                , "SSE4_2"],
     ["crc32"            , "X:r32, r32/m32"                              , "RM"      , "F2 0F 38 F1 /r"                   , "SSE4_2"],
@@ -1288,6 +1308,66 @@ $export[$as] =
     ["movbe"            , "W:m16, r16"                                  , "MR"      , "66 0F 38 F1 /r"                   , "MOVBE"],
     ["movbe"            , "W:m32, r32"                                  , "MR"      , "0F 38 F1 /r"                      , "MOVBE"],
     ["movbe"            , "W:m64, r64"                                  , "MR"      , "REX.W 0F 38 F1 /r"                , "MOVBE X64"],
+
+    ["blci"             , "W:r32, r32/m32"                              , "VM"      , "XOP.NDD.LZ.M09.W0 02 /6"          , "TBM"],
+    ["blci"             , "W:r64, r64/m64"                              , "VM"      , "XOP.NDD.LZ.M09.W1 02 /6"          , "TBM X64"],
+    ["blcic"            , "W:r32, r32/m32"                              , "VM"      , "XOP.NDD.LZ.M09.W0 01 /5"          , "TBM"],
+    ["blcic"            , "W:r64, r64/m64"                              , "VM"      , "XOP.NDD.LZ.M09.W1 01 /5"          , "TBM X64"],
+    ["blsic"            , "W:r32, r32/m32"                              , "VM"      , "XOP.NDD.LZ.M09.W0 01 /6"          , "TBM"],
+    ["blsic"            , "W:r64, r64/m64"                              , "VM"      , "XOP.NDD.LZ.M09.W1 01 /6"          , "TBM X64"],
+    ["blcfill"          , "W:r32, r32/m32"                              , "VM"      , "XOP.NDD.LZ.M09.W0 01 /1"          , "TBM"],
+    ["blcfill"          , "W:r64, r64/m64"                              , "VM"      , "XOP.NDD.LZ.M09.W1 01 /1"          , "TBM X64"],
+    ["blsfill"          , "W:r32, r32/m32"                              , "VM"      , "XOP.NDD.LZ.M09.W0 01 /2"          , "TBM"],
+    ["blsfill"          , "W:r64, r64/m64"                              , "VM"      , "XOP.NDD.LZ.M09.W1 01 /2"          , "TBM X64"],
+    ["blcmsk"           , "W:r32, r32/m32"                              , "VM"      , "XOP.NDD.LZ.M09.W0 02 /1"          , "TBM"],
+    ["blcmsk"           , "W:r64, r64/m64"                              , "VM"      , "XOP.NDD.LZ.M09.W1 02 /1"          , "TBM X64"],
+    ["blcs"             , "W:r32, r32/m32"                              , "VM"      , "XOP.NDD.LZ.M09.W0 01 /3"          , "TBM"],
+    ["blcs"             , "W:r64, r64/m64"                              , "VM"      , "XOP.NDD.LZ.M09.W1 01 /3"          , "TBM X64"],
+    ["tzmsk"            , "W:r32, r32/m32"                              , "VM"      , "XOP.NDD.LZ.M09.W0 01 /4"          , "TBM"],
+    ["tzmsk"            , "W:r64, r64/m64"                              , "VM"      , "XOP.NDD.LZ.M09.W1 01 /4"          , "TBM X64"],
+    ["t1mskc"           , "W:r32, r32/m32"                              , "VM"      , "XOP.NDD.LZ.M09.W0 01 /7"          , "TBM"],
+    ["t1mskc"           , "W:r64, r64/m64"                              , "VM"      , "XOP.NDD.LZ.M09.W1 01 /7"          , "TBM X64"],
+
+    ["llwpcb"           , "R:r32"                                       , "M"       , "XOP.L0.P0.M09.W0 12 /0"           , "LWP"],
+    ["llwpcb"           , "R:r64"                                       , "M"       , "XOP.L0.P0.M09.W1 12 /0"           , "LWP X64"],
+    ["lwpins"           , "R:r32, R:r32/m32, id/ud"                     , "VMI"     , "XOP.L0.P0.M0A.W0 12 /0 id"        , "LWP"],
+    ["lwpins"           , "R:r64, R:r32/m32, id/ud"                     , "VMI"     , "XOP.L0.P0.M0A.W1 12 /0 id"        , "LWP X64"],
+    ["lwpval"           , "R:r32, R:r32/m32, id/ud"                     , "VMI"     , "XOP.L0.P0.M0A.W0 12 /1 id"        , "LWP"],
+    ["lwpval"           , "R:r64, R:r32/m32, id/ud"                     , "VMI"     , "XOP.L0.P0.M0A.W1 12 /1 id"        , "LWP X64"],
+    ["slwpcb"           , "W:r32"                                       , "M"       , "XOP.L0.P0.M09.W0 12 /1"           , "LWP"],
+    ["slwpcb"           , "W:r64"                                       , "M"       , "XOP.L0.P0.M09.W1 12 /1"           , "LWP X64"],
+
+    ["getsec"           , ""                                            , "NONE"    , "0F 37"                            , "SMX"],
+
+    ["invept"           , "R:r32, R:m128"                               , "RM"      , "66 0F 38 80 /r"                   , "VMX X86          PRIVILEGE=L0"],
+    ["invept"           , "R:r64, R:m128"                               , "RM"      , "66 0F 38 80 /r"                   , "VMX X64          PRIVILEGE=L0"],
+    ["invvpid"          , "R:r32, R:m128"                               , "RM"      , "66 0F 38 81 /r"                   , "VMX X86          PRIVILEGE=L0"],
+    ["invvpid"          , "R:r64, R:m128"                               , "RM"      , "66 0F 38 81 /r"                   , "VMX X64          PRIVILEGE=L0"],
+    ["vmcall"           , ""                                            , "NONE"    , "0F 01 C1"                         , "VMX              PRIVILEGE=L0"],
+    ["vmclear"          , "W:m64"                                       , "M"       , "66 0F C7 /6"                      , "VMX X64          PRIVILEGE=L0"],
+    ["vmfunc"           , ""                                            , "NONE"    , "0F 01 D4"                         , "VMX"],
+    ["vmlaunch"         , ""                                            , "NONE"    , "0F 01 C2"                         , "VMX              PRIVILEGE=L0"],
+    ["vmptrld"          , "R:m64"                                       , "M"       , "0F C7 /6"                         , "VMX              PRIVILEGE=L0"],
+    ["vmptrst"          , "W:m64"                                       , "M"       , "0F C7 /7"                         , "VMX              PRIVILEGE=L0"],
+    ["vmread"           , "W:r32/m32, R:r32"                            , "MR"      , "0F 78 /r"                         , "VMX X86          PRIVILEGE=L0"],
+    ["vmread"           , "W:r64/m64, R:r64"                            , "MR"      , "0F 78 /r"                         , "VMX X64          PRIVILEGE=L0"],
+    ["vmresume"         , ""                                            , "NONE"    , "0F 01 C3"                         , "VMX              PRIVILEGE=L0"],
+    ["vmwrite"          , "R:r32, R:r32/m32"                            , "RM"      , "0F 79 /r"                         , "VMX X86          PRIVILEGE=L0"],
+    ["vmwrite"          , "R:r64, R:r64/m64"                            , "RM"      , "0F 79 /r"                         , "VMX X64          PRIVILEGE=L0"],
+    ["vmxon"            , "R:m64"                                       , "M"       , "F3 0F C7 /6"                      , "VMX"],
+
+    ["skinit"           , "X:<eax>"                                     , "NONE"    , "0F 01 DE"                         , "SKINIT           PRIVILEGE=L0"],
+    ["stgi"             , ""                                            , "NONE"    , "0F 01 DC"                         , "SKINIT           PRIVILEGE=L0"],
+    ["clgi"             , ""                                            , "NONE"    , "0F 01 DD"                         , "SVM              PRIVILEGE=L0"],
+    ["invlpga"          , "R:<eax>, R:<ecx>"                            , "NONE"    , "0F 01 DF"                         , "SVM              PRIVILEGE=L0"],
+    ["invlpga"          , "R:<rax>, R:<ecx>"                            , "NONE"    , "0F 01 DF"                         , "SVM X64          PRIVILEGE=L0"],
+    ["vmload"           , "R:<eax>"                                     , "NONE"    , "0F 01 DA"                         , "SVM X86          PRIVILEGE=L0"],
+    ["vmload"           , "R:<rax>"                                     , "NONE"    , "0F 01 DA"                         , "SVM X64          PRIVILEGE=L0"],
+    ["vmmcall"          , ""                                            , "NONE"    , "0F 01 D9"                         , "SVM"],
+    ["vmrun"            , "X:<eax>"                                     , "NONE"    , "0F 01 D8"                         , "SVM X86          PRIVILEGE=L0"],
+    ["vmrun"            , "X:<rax>"                                     , "NONE"    , "0F 01 D8"                         , "SVM X64          PRIVILEGE=L0"],
+    ["vmsave"           , "R:<eax>"                                     , "NONE"    , "0F 01 DB"                         , "SVM X86          PRIVILEGE=L0"],
+    ["vmsave"           , "R:<rax>"                                     , "NONE"    , "0F 01 DB"                         , "SVM X64          PRIVILEGE=L0"],
 
     ["f2xm1"            , ""                                            , "NONE"    , "D9 F0"                            , "FPU              C0=U C1=W C2=U C3=U"],
     ["fabs"             , ""                                            , "NONE"    , "D9 E1"                            , "FPU              C0=U C1=0 C2=U C3=U"],
@@ -2647,24 +2727,24 @@ $export[$as] =
     ["vfnmsubss"        , "W:xmm[3:0], xmm[3:0], xmm[3:0], xmm[3:0]/m32", "RVSM"    , "VEX.NDS.128.66.0F3A.W1 7E /r /is4", "FMA4"],
     ["vfnmsubss"        , "W:xmm[3:0], xmm[3:0], xmm[3:0]/m32, xmm[3:0]", "RVMS"    , "VEX.NDS.128.66.0F3A.W0 7E /r /is4", "FMA4"],
 
-    ["vfrczpd"          , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M9.W0 81 /r"            , "XOP"],
-    ["vfrczpd"          , "W:ymm, ymm/m256"                             , "RM"      , "XOP.L1.P0.M9.W0 81 /r"            , "XOP"],
-    ["vfrczps"          , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M9.W0 80 /r"            , "XOP"],
-    ["vfrczps"          , "W:ymm, ymm/m256"                             , "RM"      , "XOP.L1.P0.M9.W0 80 /r"            , "XOP"],
-    ["vfrczsd"          , "W:xmm[7:0], xmm[7:0]/m64"                    , "RM"      , "XOP.L0.P0.M9.W0 83 /r"            , "XOP"],
-    ["vfrczss"          , "W:xmm[3:0], xmm[3:0]/m32"                    , "RM"      , "XOP.L0.P0.M9.W0 82 /r"            , "XOP"],
-    ["vpcmov"           , "W:xmm, xmm, xmm, xmm/m128"                   , "RVSM"    , "XOP.NDS.L0.P0.M8.W1 A2 /r /is4"   , "XOP"],
-    ["vpcmov"           , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M8.W0 A2 /r /is4"   , "XOP"],
-    ["vpcmov"           , "W:ymm, ymm, ymm, ymm/m256"                   , "RVSM"    , "XOP.NDS.L1.P0.M8.W1 A2 /r /is4"   , "XOP"],
-    ["vpcmov"           , "W:ymm, ymm, ymm/m256, ymm"                   , "RVMS"    , "XOP.NDS.L1.P0.M8.W0 A2 /r /is4"   , "XOP"],
-    ["vpcomb"           , "W:xmm, xmm, xmm/m128, ub"                    , "RVMI"    , "XOP.NDS.L0.P0.M8.W0 CC /r ib"     , "XOP"],
-    ["vpcomd"           , "W:xmm, xmm, xmm/m128, ub"                    , "RVMI"    , "XOP.NDS.L0.P0.M8.W0 CE /r ib"     , "XOP"],
-    ["vpcomq"           , "W:xmm, xmm, xmm/m128, ub"                    , "RVMI"    , "XOP.NDS.L0.P0.M8.W0 CF /r ib"     , "XOP"],
-    ["vpcomub"          , "W:xmm, xmm, xmm/m128, ub"                    , "RVMI"    , "XOP.NDS.L0.P0.M8.W0 EC /r ib"     , "XOP"],
-    ["vpcomud"          , "W:xmm, xmm, xmm/m128, ub"                    , "RVMI"    , "XOP.NDS.L0.P0.M8.W0 EE /r ib"     , "XOP"],
-    ["vpcomuq"          , "W:xmm, xmm, xmm/m128, ub"                    , "RVMI"    , "XOP.NDS.L0.P0.M8.W0 EF /r ib"     , "XOP"],
-    ["vpcomuw"          , "W:xmm, xmm, xmm/m128, ub"                    , "RVMI"    , "XOP.NDS.L0.P0.M8.W0 ED /r ib"     , "XOP"],
-    ["vpcomw"           , "W:xmm, xmm, xmm/m128, ub"                    , "RVMI"    , "XOP.NDS.L0.P0.M8.W0 CD /r ib"     , "XOP"],
+    ["vfrczpd"          , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M09.W0 81 /r"           , "XOP"],
+    ["vfrczpd"          , "W:ymm, ymm/m256"                             , "RM"      , "XOP.L1.P0.M09.W0 81 /r"           , "XOP"],
+    ["vfrczps"          , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M09.W0 80 /r"           , "XOP"],
+    ["vfrczps"          , "W:ymm, ymm/m256"                             , "RM"      , "XOP.L1.P0.M09.W0 80 /r"           , "XOP"],
+    ["vfrczsd"          , "W:xmm[7:0], xmm[7:0]/m64"                    , "RM"      , "XOP.L0.P0.M09.W0 83 /r"           , "XOP"],
+    ["vfrczss"          , "W:xmm[3:0], xmm[3:0]/m32"                    , "RM"      , "XOP.L0.P0.M09.W0 82 /r"           , "XOP"],
+    ["vpcmov"           , "W:xmm, xmm, xmm, xmm/m128"                   , "RVSM"    , "XOP.NDS.L0.P0.M08.W1 A2 /r /is4"  , "XOP"],
+    ["vpcmov"           , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M08.W0 A2 /r /is4"  , "XOP"],
+    ["vpcmov"           , "W:ymm, ymm, ymm, ymm/m256"                   , "RVSM"    , "XOP.NDS.L1.P0.M08.W1 A2 /r /is4"  , "XOP"],
+    ["vpcmov"           , "W:ymm, ymm, ymm/m256, ymm"                   , "RVMS"    , "XOP.NDS.L1.P0.M08.W0 A2 /r /is4"  , "XOP"],
+    ["vpcomb"           , "W:xmm, xmm, xmm/m128, ub"                    , "RVMI"    , "XOP.NDS.L0.P0.M08.W0 CC /r ib"    , "XOP"],
+    ["vpcomd"           , "W:xmm, xmm, xmm/m128, ub"                    , "RVMI"    , "XOP.NDS.L0.P0.M08.W0 CE /r ib"    , "XOP"],
+    ["vpcomq"           , "W:xmm, xmm, xmm/m128, ub"                    , "RVMI"    , "XOP.NDS.L0.P0.M08.W0 CF /r ib"    , "XOP"],
+    ["vpcomub"          , "W:xmm, xmm, xmm/m128, ub"                    , "RVMI"    , "XOP.NDS.L0.P0.M08.W0 EC /r ib"    , "XOP"],
+    ["vpcomud"          , "W:xmm, xmm, xmm/m128, ub"                    , "RVMI"    , "XOP.NDS.L0.P0.M08.W0 EE /r ib"    , "XOP"],
+    ["vpcomuq"          , "W:xmm, xmm, xmm/m128, ub"                    , "RVMI"    , "XOP.NDS.L0.P0.M08.W0 EF /r ib"    , "XOP"],
+    ["vpcomuw"          , "W:xmm, xmm, xmm/m128, ub"                    , "RVMI"    , "XOP.NDS.L0.P0.M08.W0 ED /r ib"    , "XOP"],
+    ["vpcomw"           , "W:xmm, xmm, xmm/m128, ub"                    , "RVMI"    , "XOP.NDS.L0.P0.M08.W0 CD /r ib"    , "XOP"],
     ["vpermil2pd"       , "W:xmm, xmm, xmm/m128, xmm, u4"               , "RVMSI"   , "VEX.L0.66.0F3A.W0 49 /r /is4"     , "XOP"],
     ["vpermil2pd"       , "W:xmm, xmm, xmm, xmm/m128, u4"               , "RVSMI"   , "VEX.L0.66.0F3A.W1 49 /r /is4"     , "XOP"],
     ["vpermil2pd"       , "W:ymm, ymm, ymm/m256, ymm, u4"               , "RVMSI"   , "VEX.L1.66.0F3A.W0 49 /r /is4"     , "XOP"],
@@ -2673,63 +2753,63 @@ $export[$as] =
     ["vpermil2ps"       , "W:xmm, xmm, xmm, xmm/m128, u4"               , "RVSMI"   , "VEX.L0.66.0F3A.W1 48 /r /is4"     , "XOP"],
     ["vpermil2ps"       , "W:ymm, ymm, ymm/m256, ymm, u4"               , "RVMSI"   , "VEX.L1.66.0F3A.W0 48 /r /is4"     , "XOP"],
     ["vpermil2ps"       , "W:ymm, ymm, ymm, ymm/m256, u4"               , "RVSMI"   , "VEX.L1.66.0F3A.W1 48 /r /is4"     , "XOP"],
-    ["vphaddbd"         , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M9.W0 C2 /r"            , "XOP"],
-    ["vphaddbq"         , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M9.W0 C3 /r"            , "XOP"],
-    ["vphaddbw"         , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M9.W0 C1 /r"            , "XOP"],
-    ["vphadddq"         , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M9.W0 CB /r"            , "XOP"],
-    ["vphaddubd"        , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M9.W0 D2 /r"            , "XOP"],
-    ["vphaddubq"        , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M9.W0 D3 /r"            , "XOP"],
-    ["vphaddubw"        , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M9.W0 D1 /r"            , "XOP"],
-    ["vphaddudq"        , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M9.W0 DB /r"            , "XOP"],
-    ["vphadduwd"        , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M9.W0 D6 /r"            , "XOP"],
-    ["vphadduwq"        , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M9.W0 D7 /r"            , "XOP"],
-    ["vphaddwd"         , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M9.W0 C6 /r"            , "XOP"],
-    ["vphaddwq"         , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M9.W0 C7 /r"            , "XOP"],
-    ["vphsubbw"         , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M9.W0 E1 /r"            , "XOP"],
-    ["vphsubdq"         , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M9.W0 E3 /r"            , "XOP"],
-    ["vphsubwd"         , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M9.W0 E2 /r"            , "XOP"],
-    ["vpmacsdd"         , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M8.W0 9E /r /is4"   , "XOP"],
-    ["vpmacsdqh"        , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M8.W0 9F /r /is4"   , "XOP"],
-    ["vpmacsdql"        , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M8.W0 97 /r /is4"   , "XOP"],
-    ["vpmacssdd"        , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M8.W0 8E /r /is4"   , "XOP"],
-    ["vpmacssdqh"       , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M8.W0 8F /r /is4"   , "XOP"],
-    ["vpmacssdql"       , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M8.W0 87 /r /is4"   , "XOP"],
-    ["vpmacsswd"        , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M8.W0 86 /r /is4"   , "XOP"],
-    ["vpmacssww"        , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M8.W0 85 /r /is4"   , "XOP"],
-    ["vpmacswd"         , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M8.W0 96 /r /is4"   , "XOP"],
-    ["vpmacsww"         , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M8.W0 95 /r /is4"   , "XOP"],
-    ["vpmadcsswd"       , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M8.W0 A6 /r /is4"   , "XOP"],
-    ["vpmadcswd"        , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M8.W0 B6 /r /is4"   , "XOP"],
-    ["vpperm"           , "W:xmm, xmm, xmm, xmm/m128"                   , "RVSM"    , "XOP.NDS.L0.P0.M8.W1 A3 /r /is4"   , "XOP"],
-    ["vpperm"           , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M8.W0 A3 /r /is4"   , "XOP"],
-    ["vprotb"           , "W:xmm, xmm, xmm/m128"                        , "RVM"     , "XOP.NDS.L0.P0.M9.W1 90 /r"        , "XOP"],
-    ["vprotb"           , "W:xmm, xmm/m128, ub"                         , "RMI"     , "XOP.L0.P0.M8.W0 C0 /r ib"         , "XOP"],
-    ["vprotb"           , "W:xmm, xmm/m128, xmm"                        , "RMV"     , "XOP.NDS.L0.P0.M9.W0 90 /r"        , "XOP"],
-    ["vprotd"           , "W:xmm, xmm, xmm/m128"                        , "RVM"     , "XOP.NDS.L0.P0.M9.W1 92 /r"        , "XOP"],
-    ["vprotd"           , "W:xmm, xmm/m128, ub"                         , "RMI"     , "XOP.L0.P0.M8.W0 C2 /r ib"         , "XOP"],
-    ["vprotd"           , "W:xmm, xmm/m128, xmm"                        , "RMV"     , "XOP.NDS.L0.P0.M9.W0 92 /r"        , "XOP"],
-    ["vprotq"           , "W:xmm, xmm, xmm/m128"                        , "RVM"     , "XOP.NDS.L0.P0.M9.W1 93 /r"        , "XOP"],
-    ["vprotq"           , "W:xmm, xmm/m128, ub"                         , "RMI"     , "XOP.L0.P0.M8.W0 C3 /r ib"         , "XOP"],
-    ["vprotq"           , "W:xmm, xmm/m128, xmm"                        , "RMV"     , "XOP.NDS.L0.P0.M9.W0 93 /r"        , "XOP"],
-    ["vprotw"           , "W:xmm, xmm, xmm/m128"                        , "RVM"     , "XOP.NDS.L0.P0.M9.W1 91 /r"        , "XOP"],
-    ["vprotw"           , "W:xmm, xmm/m128, ub"                         , "RMI"     , "XOP.L0.P0.M8.W0 C1 /r ib"         , "XOP"],
-    ["vprotw"           , "W:xmm, xmm/m128, xmm"                        , "RMV"     , "XOP.NDS.L0.P0.M9.W0 91 /r"        , "XOP"],
-    ["vpshab"           , "W:xmm, xmm, xmm/m128"                        , "RVM"     , "XOP.NDS.L0.P0.M9.W1 98 /r"        , "XOP"],
-    ["vpshab"           , "W:xmm, xmm/m128, xmm"                        , "RMV"     , "XOP.NDS.L0.P0.M9.W0 98 /r"        , "XOP"],
-    ["vpshad"           , "W:xmm, xmm, xmm/m128"                        , "RVM"     , "XOP.NDS.L0.P0.M9.W1 9A /r"        , "XOP"],
-    ["vpshad"           , "W:xmm, xmm/m128, xmm"                        , "RMV"     , "XOP.NDS.L0.P0.M9.W0 9A /r"        , "XOP"],
-    ["vpshaq"           , "W:xmm, xmm, xmm/m128"                        , "RVM"     , "XOP.NDS.L0.P0.M9.W1 9B /r"        , "XOP"],
-    ["vpshaq"           , "W:xmm, xmm/m128, xmm"                        , "RMV"     , "XOP.NDS.L0.P0.M9.W0 9B /r"        , "XOP"],
-    ["vpshaw"           , "W:xmm, xmm, xmm/m128"                        , "RVM"     , "XOP.NDS.L0.P0.M9.W1 99 /r"        , "XOP"],
-    ["vpshaw"           , "W:xmm, xmm/m128, xmm"                        , "RMV"     , "XOP.NDS.L0.P0.M9.W0 99 /r"        , "XOP"],
-    ["vpshlb"           , "W:xmm, xmm, xmm/m128"                        , "RVM"     , "XOP.NDS.L0.P0.M9.W1 94 /r"        , "XOP"],
-    ["vpshlb"           , "W:xmm, xmm/m128, xmm"                        , "RMV"     , "XOP.NDS.L0.P0.M9.W0 94 /r"        , "XOP"],
-    ["vpshld"           , "W:xmm, xmm, xmm/m128"                        , "RVM"     , "XOP.NDS.L0.P0.M9.W1 96 /r"        , "XOP"],
-    ["vpshld"           , "W:xmm, xmm/m128, xmm"                        , "RMV"     , "XOP.NDS.L0.P0.M9.W0 96 /r"        , "XOP"],
-    ["vpshlq"           , "W:xmm, xmm, xmm/m128"                        , "RVM"     , "XOP.NDS.L0.P0.M9.W1 97 /r"        , "XOP"],
-    ["vpshlq"           , "W:xmm, xmm/m128, xmm"                        , "RMV"     , "XOP.NDS.L0.P0.M9.W0 97 /r"        , "XOP"],
-    ["vpshlw"           , "W:xmm, xmm, xmm/m128"                        , "RVM"     , "XOP.NDS.L0.P0.M9.W1 95 /r"        , "XOP"],
-    ["vpshlw"           , "W:xmm, xmm/m128, xmm"                        , "RMV"     , "XOP.NDS.L0.P0.M9.W0 95 /r"        , "XOP"],
+    ["vphaddbd"         , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M09.W0 C2 /r"           , "XOP"],
+    ["vphaddbq"         , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M09.W0 C3 /r"           , "XOP"],
+    ["vphaddbw"         , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M09.W0 C1 /r"           , "XOP"],
+    ["vphadddq"         , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M09.W0 CB /r"           , "XOP"],
+    ["vphaddubd"        , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M09.W0 D2 /r"           , "XOP"],
+    ["vphaddubq"        , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M09.W0 D3 /r"           , "XOP"],
+    ["vphaddubw"        , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M09.W0 D1 /r"           , "XOP"],
+    ["vphaddudq"        , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M09.W0 DB /r"           , "XOP"],
+    ["vphadduwd"        , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M09.W0 D6 /r"           , "XOP"],
+    ["vphadduwq"        , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M09.W0 D7 /r"           , "XOP"],
+    ["vphaddwd"         , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M09.W0 C6 /r"           , "XOP"],
+    ["vphaddwq"         , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M09.W0 C7 /r"           , "XOP"],
+    ["vphsubbw"         , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M09.W0 E1 /r"           , "XOP"],
+    ["vphsubdq"         , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M09.W0 E3 /r"           , "XOP"],
+    ["vphsubwd"         , "W:xmm, xmm/m128"                             , "RM"      , "XOP.L0.P0.M09.W0 E2 /r"           , "XOP"],
+    ["vpmacsdd"         , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M08.W0 9E /r /is4"  , "XOP"],
+    ["vpmacsdqh"        , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M08.W0 9F /r /is4"  , "XOP"],
+    ["vpmacsdql"        , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M08.W0 97 /r /is4"  , "XOP"],
+    ["vpmacssdd"        , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M08.W0 8E /r /is4"  , "XOP"],
+    ["vpmacssdqh"       , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M08.W0 8F /r /is4"  , "XOP"],
+    ["vpmacssdql"       , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M08.W0 87 /r /is4"  , "XOP"],
+    ["vpmacsswd"        , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M08.W0 86 /r /is4"  , "XOP"],
+    ["vpmacssww"        , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M08.W0 85 /r /is4"  , "XOP"],
+    ["vpmacswd"         , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M08.W0 96 /r /is4"  , "XOP"],
+    ["vpmacsww"         , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M08.W0 95 /r /is4"  , "XOP"],
+    ["vpmadcsswd"       , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M08.W0 A6 /r /is4"  , "XOP"],
+    ["vpmadcswd"        , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M08.W0 B6 /r /is4"  , "XOP"],
+    ["vpperm"           , "W:xmm, xmm, xmm, xmm/m128"                   , "RVSM"    , "XOP.NDS.L0.P0.M08.W1 A3 /r /is4"  , "XOP"],
+    ["vpperm"           , "W:xmm, xmm, xmm/m128, xmm"                   , "RVMS"    , "XOP.NDS.L0.P0.M08.W0 A3 /r /is4"  , "XOP"],
+    ["vprotb"           , "W:xmm, xmm, xmm/m128"                        , "RVM"     , "XOP.NDS.L0.P0.M09.W1 90 /r"       , "XOP"],
+    ["vprotb"           , "W:xmm, xmm/m128, ub"                         , "RMI"     , "XOP.NDS.L0.P0.M08.W0 C0 /r ib"    , "XOP"],
+    ["vprotb"           , "W:xmm, xmm/m128, xmm"                        , "RMV"     , "XOP.NDS.L0.P0.M09.W0 90 /r"       , "XOP"],
+    ["vprotd"           , "W:xmm, xmm, xmm/m128"                        , "RVM"     , "XOP.NDS.L0.P0.M09.W1 92 /r"       , "XOP"],
+    ["vprotd"           , "W:xmm, xmm/m128, ub"                         , "RMI"     , "XOP.NDS.L0.P0.M08.W0 C2 /r ib"    , "XOP"],
+    ["vprotd"           , "W:xmm, xmm/m128, xmm"                        , "RMV"     , "XOP.NDS.L0.P0.M09.W0 92 /r"       , "XOP"],
+    ["vprotq"           , "W:xmm, xmm, xmm/m128"                        , "RVM"     , "XOP.NDS.L0.P0.M09.W1 93 /r"       , "XOP"],
+    ["vprotq"           , "W:xmm, xmm/m128, ub"                         , "RMI"     , "XOP.NDS.L0.P0.M08.W0 C3 /r ib"    , "XOP"],
+    ["vprotq"           , "W:xmm, xmm/m128, xmm"                        , "RMV"     , "XOP.NDS.L0.P0.M09.W0 93 /r"       , "XOP"],
+    ["vprotw"           , "W:xmm, xmm, xmm/m128"                        , "RVM"     , "XOP.NDS.L0.P0.M09.W1 91 /r"       , "XOP"],
+    ["vprotw"           , "W:xmm, xmm/m128, ub"                         , "RMI"     , "XOP.NDS.L0.P0.M08.W0 C1 /r ib"    , "XOP"],
+    ["vprotw"           , "W:xmm, xmm/m128, xmm"                        , "RMV"     , "XOP.NDS.L0.P0.M09.W0 91 /r"       , "XOP"],
+    ["vpshab"           , "W:xmm, xmm, xmm/m128"                        , "RVM"     , "XOP.NDS.L0.P0.M09.W1 98 /r"       , "XOP"],
+    ["vpshab"           , "W:xmm, xmm/m128, xmm"                        , "RMV"     , "XOP.NDS.L0.P0.M09.W0 98 /r"       , "XOP"],
+    ["vpshad"           , "W:xmm, xmm, xmm/m128"                        , "RVM"     , "XOP.NDS.L0.P0.M09.W1 9A /r"       , "XOP"],
+    ["vpshad"           , "W:xmm, xmm/m128, xmm"                        , "RMV"     , "XOP.NDS.L0.P0.M09.W0 9A /r"       , "XOP"],
+    ["vpshaq"           , "W:xmm, xmm, xmm/m128"                        , "RVM"     , "XOP.NDS.L0.P0.M09.W1 9B /r"       , "XOP"],
+    ["vpshaq"           , "W:xmm, xmm/m128, xmm"                        , "RMV"     , "XOP.NDS.L0.P0.M09.W0 9B /r"       , "XOP"],
+    ["vpshaw"           , "W:xmm, xmm, xmm/m128"                        , "RVM"     , "XOP.NDS.L0.P0.M09.W1 99 /r"       , "XOP"],
+    ["vpshaw"           , "W:xmm, xmm/m128, xmm"                        , "RMV"     , "XOP.NDS.L0.P0.M09.W0 99 /r"       , "XOP"],
+    ["vpshlb"           , "W:xmm, xmm, xmm/m128"                        , "RVM"     , "XOP.NDS.L0.P0.M09.W1 94 /r"       , "XOP"],
+    ["vpshlb"           , "W:xmm, xmm/m128, xmm"                        , "RMV"     , "XOP.NDS.L0.P0.M09.W0 94 /r"       , "XOP"],
+    ["vpshld"           , "W:xmm, xmm, xmm/m128"                        , "RVM"     , "XOP.NDS.L0.P0.M09.W1 96 /r"       , "XOP"],
+    ["vpshld"           , "W:xmm, xmm/m128, xmm"                        , "RMV"     , "XOP.NDS.L0.P0.M09.W0 96 /r"       , "XOP"],
+    ["vpshlq"           , "W:xmm, xmm, xmm/m128"                        , "RVM"     , "XOP.NDS.L0.P0.M09.W1 97 /r"       , "XOP"],
+    ["vpshlq"           , "W:xmm, xmm/m128, xmm"                        , "RMV"     , "XOP.NDS.L0.P0.M09.W0 97 /r"       , "XOP"],
+    ["vpshlw"           , "W:xmm, xmm, xmm/m128"                        , "RVM"     , "XOP.NDS.L0.P0.M09.W1 95 /r"       , "XOP"],
+    ["vpshlw"           , "W:xmm, xmm/m128, xmm"                        , "RMV"     , "XOP.NDS.L0.P0.M09.W0 95 /r"       , "XOP"],
 
     ["kaddb"            , "W:k[0]  ,↔k[0]  ,↔k[0]"                      , "RVM"     , "VEX.L1.66.0F.W0 4A /r"            , "AVX512_DQ"],
     ["kaddd"            , "W:k[3:0],↔k[3:0],↔k[3:0]"                    , "RVM"     , "VEX.L1.66.0F.W1 4A /r"            , "AVX512_BW"],

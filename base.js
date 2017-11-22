@@ -4,20 +4,20 @@
 // [License]
 // Public Domain.
 
-(function($export, $as) {
+(function($scope, $as) {
 "use strict";
 
-const base = $export[$as] = {};
+function FAIL(msg) { throw new Error("[BASE] " + msg); }
+
+// Import.
 const hasOwn = Object.prototype.hasOwnProperty;
 
-// Creates an Object without a prototype (used as a map).
+// Export.
+const base = $scope[$as] = Object.create(null);
+
 function dict() { return Object.create(null); }
-
-// If something failed...
-function fail(msg) { throw new Error("[BASE] " + msg); }
-
-// Replaces default arguments object (if not provided).
-const NoObject = Object.freeze(Object.create(null));
+base.dict = dict;
+const NONE = base.NONE = Object.freeze(dict());
 
 // Indexes used by instruction-data.
 const kIndexName     = 0;
@@ -27,26 +27,51 @@ const kIndexOpcode   = 3;
 const kIndexMetadata = 4;
 
 // ============================================================================
+// [asmdb.base.Symbols]
+// ============================================================================
+
+const Symbols = {
+  kCommutative: '\u2194'
+};
+base.Symbols = Symbols;
+
+// ============================================================================
 // [asmdb.base.Parsing]
 // ============================================================================
 
 // Namespace that provides functions related to text parsing.
-class Parsing {
+const Parsing = {
+  // Get whether the string `s` representing an operand is <implicit>.
+  isImplicit: function(s) { return s.startsWith("<") && s.endsWith(">"); },
+
+  // Clear <implicit> attribute from the given operand string `s`.
+  clearImplicit: function(s) { return s.substring(1, s.length - 1); },
+
+  // Get whether the string `s` representing an operand is {optional}.
+  isOptional: function(s) { return s.startsWith("{") && s.endsWith("}"); },
+
+  // Clear {optional} attribute from the given operand string `s`.
+  clearOptional: function(s) { return s.substring(1, s.length - 1); },
+
+  // Get whether the string `s` representing an operand specifies commutativity.
+  isCommutative: function(s) { return s.length > 0 && s.charAt(0) === Symbols.kCommutative; },
+
+  // Clear commutative attribute from the given operand string `s`.
+  clearCommutative: function(s) { return s.substring(1); },
+
   // Matches a closing bracket in string `s` starting `from` the given index.
   // It behaves like `s.indexOf()`, but uses a counter and skips all nested
   // matches.
-  static matchClosingChar(s, from) {
+  matchClosingChar: function(s, from) {
+    const len = s.length;
     const opening = s.charCodeAt(from);
     const closing = opening === 40  ? 31  :    // ().
                     opening === 60  ? 62  :    // <>.
                     opening === 91  ? 93  :    // [].
                     opening === 123 ? 125 : 0; // {}.
 
-    const len = s.length;
-
     var i = from;
     var pending = 1;
-
     do {
       if (++i >= len)
         break;
@@ -57,14 +82,14 @@ class Parsing {
     } while (pending);
 
     return i;
-  }
+  },
 
   // Split instruction operands into an array containing each operand as a
   // trimmed string. This function is similar to `s.split(",")`, however,
   // it matches brackets inside the operands and won't just blindly split
   // the string based on "," token. If operand contains metadata or it's
   // an address it would still be split correctly.
-  static splitOperands(s) {
+  splitOperands: function(s) {
     const result = [];
 
     s = s.trim();
@@ -78,7 +103,7 @@ class Parsing {
       if (i === s.length || (c = s[i]) === ",") {
         const op = s.substring(start, i).trim();
         if (!op)
-          fail(`Found empty operand in '${s}'`);
+          FAIL(`Found empty operand in '${s}'`);
 
         result.push(op);
         if (i === s.length)
@@ -239,7 +264,7 @@ class Instruction {
           break;
 
         default:
-          fail(`Unknown attribute type ${attributeDef.type}`);
+          FAIL(`Unknown attribute type ${attributeDef.type}`);
       }
 
       this.attributes[key] = value;
@@ -458,7 +483,7 @@ class ISA {
 
   addData(data) {
     if (typeof data !== "object" || !data)
-      fail("Data must be object");
+      FAIL("Data must be object");
 
     if (data.cpuLevels) this._addCpuLevels(data.cpuLevels);
     if (data.extensions) this._addExtensions(data.extensions);
@@ -470,7 +495,7 @@ class ISA {
 
   _addCpuLevels(items) {
     if (!Array.isArray(items))
-      fail("Property 'cpuLevels' must be array");
+      FAIL("Property 'cpuLevels' must be array");
 
     for (var i = 0; i < items.length; i++) {
       const item = items[i];
@@ -486,7 +511,7 @@ class ISA {
 
   _addExtensions(items) {
     if (!Array.isArray(items))
-      fail("Property 'extensions' must be array");
+      FAIL("Property 'extensions' must be array");
 
     for (var i = 0; i < items.length; i++) {
       const item = items[i];
@@ -503,7 +528,7 @@ class ISA {
 
   _addAttributes(items) {
     if (!Array.isArray(items))
-      fail("Property 'attributes' must be array");
+      FAIL("Property 'attributes' must be array");
 
     for (var i = 0; i < items.length; i++) {
       const item = items[i];
@@ -511,7 +536,7 @@ class ISA {
       const type = item.type;
 
       if (!/^(?:flag|string|string\[\])$/.test(type))
-        fail(`Unknown attribute type '${type}'`);
+        FAIL(`Unknown attribute type '${type}'`);
 
       const obj = {
         name: name,
@@ -525,7 +550,7 @@ class ISA {
 
   _addSpecialRegs(items) {
     if (!Array.isArray(items))
-      fail("Property 'specialRegs' must be array");
+      FAIL("Property 'specialRegs' must be array");
 
     for (var i = 0; i < items.length; i++) {
       const item = items[i];
@@ -543,7 +568,7 @@ class ISA {
 
   _addShortcuts(items) {
     if (!Array.isArray(items))
-      fail("Property 'shortcuts' must be array");
+      FAIL("Property 'shortcuts' must be array");
 
     for (var i = 0; i < items.length; i++) {
       const item = items[i];
@@ -551,7 +576,7 @@ class ISA {
       const expand = item.expand;
 
       if (!name || !expand)
-        fail("Shortcut must contain 'name' and 'expand' properties");
+        FAIL("Shortcut must contain 'name' and 'expand' properties");
 
       const obj = {
         name  : name,
@@ -603,7 +628,7 @@ class ISA {
   }
 
   _createInstruction(name, operands, encoding, opcode, metadata) {
-    fail("Abstract method called");
+    FAIL("Abstract method called");
   }
 }
 base.ISA = ISA;

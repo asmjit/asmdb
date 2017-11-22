@@ -11,7 +11,7 @@ NOTE: There is currently work-in-progress to more standardize the database betwe
 Data Files
 ----------
 
-Data files use `.js` suffix and are `require()`d and interepreted as JavaScript, however, these files are also parseable as JSON after locating JSON-BEGIN and JSON-END marks and stripping content outside of them. The database is meant to be readable and editable, thus it tries to be smallest possible.
+Data files use `.js` suffix and are `require()`d and interepreted as JavaScript, however, these files are also parseable as JSON after locating JSON-BEGIN and JSON-END marks and stripping content outside of them. The database is meant to be readable and editable, thus it should stay small and simple.
 
 The database provides the following concepts:
 
