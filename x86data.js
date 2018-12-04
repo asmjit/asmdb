@@ -922,8 +922,8 @@ $export[$as] =
     ["rdseed"           , "W:r32"                                          , "M"       , "0F C7 /7"                         , "RDSEED           Volatile OF=0 SF=0 ZF=0 AF=0 PF=0 CF=W"],
     ["rdseed"           , "W:r64"                                          , "M"       , "REX.W 0F C7 /7"                   , "RDSEED X64       Volatile OF=0 SF=0 ZF=0 AF=0 PF=0 CF=W"],
 
-    ["ret"              , ""                                               , "NONE"    , "C3"                               , "ANY              Control=Return"],
-    ["ret"              , "uw"                                             , "I"       , "C2 iw"                            , "ANY              Control=Return"],
+    ["ret"              , ""                                               , "NONE"    , "C3"                               , "ANY REP          Control=Return"],
+    ["ret"              , "uw"                                             , "I"       , "C2 iw"                            , "ANY REP          Control=Return"],
 
     /*
     ["ret_far"          , ""                                               , "NONE"    , "CB"                               , "ANY              Control=Return"],
