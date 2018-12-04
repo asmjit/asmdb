@@ -31,7 +31,7 @@ const kIndexMetadata = 4;
 // ============================================================================
 
 const Symbols = {
-  kCommutative: '\u2194'
+  kCommutative: '~'
 };
 base.Symbols = Symbols;
 
