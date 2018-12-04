@@ -709,7 +709,7 @@ class Instruction extends base.Instruction {
   // something else it's impossible to detect.
   _postProcess() {
     var isValid = true;
-    var immCount = this.getImmCount();
+    var immCount = this.immCount;
 
     var m;
 
@@ -717,19 +717,25 @@ class Instruction extends base.Instruction {
     // encoding and opcode field. Basically if there is an "ix" in operands,
     // the encoding should contain "I".
     if (immCount > 0) {
-      var immEncoding = "I".repeat(immCount);
-
-      // "I" or "II" should be part of the encoding.
-      if (this.encoding.indexOf(immEncoding) === -1) {
-        isValid = false;
-        this.report(`Immediate(s) [${immCount}] missing in encoding: ${this.encoding}`);
+      if (immCount === 1 && this.operands[this.operands.length - 1].data === "1") {
+        // This must be one of rcl|rcr|rol|ror|sar|sal|shr. We won't validate
+        // these as these have "1" as implicit (encoded within opcode, not after).
       }
+      else {
+        var immEncoding = "I".repeat(immCount);
 
-      // Every immediate should have its imm byte ("ib", "iw", "id", or "iq") in the opcode data.
-      m = this.opcodeString.match(/(?:^|\s+)(ib|iw|id|iq)/g);
-      if (!m || m.length !== immCount) {
-        isValid = false;
-        this.report(`Immediate(s) [${immCount}] not found in opcode: ${this.opcodeString}`);
+        // "I" or "II" should be part of the encoding.
+        if (this.encoding.indexOf(immEncoding) === -1) {
+          isValid = false;
+          this.report(`Immediate(s) [${immCount}] missing in encoding: ${this.encoding}`);
+        }
+
+        // Every immediate should have its imm byte ("ib", "iw", "id", or "iq") in the opcode data.
+        m = this.opcodeString.match(/(?:^|\s+)(ib|iw|id|iq|\/is4)/g);
+        if (!m || m.length !== immCount) {
+          isValid = false;
+          this.report(`Immediate(s) [${immCount}] not found in opcode: ${this.opcodeString}`);
+        }
       }
     }
 
@@ -759,7 +765,7 @@ class Instruction extends base.Instruction {
   }
 
   // Get signature of the instruction as "ARCH PREFIX ENCODING[:operands]" form.
-  getSignature() {
+  get signature() {
     var operands = this.operands;
     var sign = this.arch;
 
@@ -796,15 +802,12 @@ class Instruction extends base.Instruction {
     return sign;
   }
 
-  getImmCount() {
+  get immCount() {
     var ops = this.operands;
     var n = 0;
-
-    for (var i = 0; i < ops.length; i++) {
-      if (ops[i] === "imm")
+    for (var i = 0; i < ops.length; i++)
+      if (ops[i].isImm())
         n++;
-    }
-
     return n;
   }
 }

@@ -461,7 +461,7 @@ class Instruction extends base.Instruction {
         field.bits++;
       }
 
-      const op = this.getOperandByName(key);
+      const op = this.operandByName(key);
       if (op && op.isImm()) op.immSize = field.bits;
     }
 
@@ -541,7 +541,7 @@ class Instruction extends base.Instruction {
     }
   }
 
-  getOperandByName(name) {
+  operandByName(name) {
     const operands = this.operands;
     for (var i = 0; i < operands.length; i++) {
       const op = operands[i];
