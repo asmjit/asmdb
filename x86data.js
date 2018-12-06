@@ -862,7 +862,8 @@ $export[$as] =
 
     ["push"             , "ib"                                             , "I"       , "6A ib"                            , "ANY"],
     ["push"             , "iw"                                             , "I"       , "66 68 iw"                         , "ANY"],
-    ["push"             , "id"                                             , "I"       , "68 id"                            , "ANY"],
+    ["push"             , "id/ud"                                          , "I"       , "68 id"                            , "X86"],
+    ["push"             , "id"                                             , "I"       , "68 id"                            , "X64"],
 
     ["push"             , "R:cs"                                           , "NONE"    , "0E"                               , "X86"],
     ["push"             , "R:ss"                                           , "NONE"    , "16"                               , "X86"],
