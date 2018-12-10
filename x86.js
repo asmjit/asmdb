@@ -90,7 +90,7 @@ class Utils {
   // Get whether the string `s` describes a memory operand.
   static isMemOp(s) { return s && /^(?:mem|mib|(?:m(?:off)?\d+(?:dec|bcd|fp|int)?)|(?:m16_\d+)|(?:vm\d+(?:x|y|z)))$/.test(s); }
   // Get whether the string `s` describes an immediate operand.
-  static isImmOp(s) { return s && /^(?:1|u4|ib|ub|iw|uw|id|ud|iq|uq)$/.test(s); }
+  static isImmOp(s) { return s && /^(?:1|i4|u4|ib|ub|iw|uw|id|ud|iq|uq)$/.test(s); }
   // Get whether the string `s` describes a relative displacement (label).
   static isRelOp(s) { return s && /^rel\d+$/.test(s); }
 
