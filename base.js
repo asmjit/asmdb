@@ -30,9 +30,9 @@ const kIndexMetadata = 4;
 // [asmdb.base.Symbols]
 // ============================================================================
 
-const Symbols = {
-  kCommutative: '~'
-};
+const Symbols = Object.freeze({
+  Commutative: '~'
+});
 base.Symbols = Symbols;
 
 // ============================================================================
@@ -54,7 +54,7 @@ const Parsing = {
   clearOptional: function(s) { return s.substring(1, s.length - 1); },
 
   // Get whether the string `s` representing an operand specifies commutativity.
-  isCommutative: function(s) { return s.length > 0 && s.charAt(0) === Symbols.kCommutative; },
+  isCommutative: function(s) { return s.length > 0 && s.charAt(0) === Symbols.Commutative; },
 
   // Clear commutative attribute from the given operand string `s`.
   clearCommutative: function(s) { return s.substring(1); },
@@ -126,28 +126,73 @@ base.Parsing = Parsing;
 // [asmdb.base.Operand]
 // ============================================================================
 
+const OperandFlags = Object.freeze({
+  Optional   : 0x00000001,
+  Implicit   : 0x00000002,
+  Commutative: 0x00000004,
+  ZExt       : 0x00000008,
+  ReadAccess : 0x00000010,
+  WriteAccess: 0x00000020
+});
+base.OperandFlags = OperandFlags;
+
 class Operand {
   constructor(data) {
-    this.type        = "";       // Type of the operand ("reg", "reg-list", "mem", "reg/mem", "imm", "rel").
-    this.data        = data;     // The operand's data (possibly processed).
-    this.optional    = false;    // Operand is {optional} (only immediates, zero in such case).
-    this.implicit    = false;    // True if the operand is implicit.
-    this.restrict    = "";       // Operand is restricted (specific register or immediate value).
-    this.zext        = false;    // True if the register would be zero extended outside the write operation.
-    this.read        = false;    // True if the operand is a read-op from reg/mem.
-    this.write       = false;    // True if the operand is a write-op to reg/mem.
-    this.commutative = false;    // True if the operand is commutative.
+    this.type = "";              // Type of the operand ("reg", "reg-list", "mem", "reg/mem", "imm", "rel").
+    this.data = data;            // The operand's data (possibly processed).
+    this.flags = 0;
+
+    this.reg = "";               // Register operand's definition.
+    this.mem = "";               // Memory operand's definition.
+    this.imm = 0;                // Immediate operand's size.
+    this.rel = 0;                // Relative displacement operand's size.
+
+    this.restrict = "";          // Operand is restricted (specific register or immediate value).
+    this.read = false;           // True if the operand is a read-op from reg/mem.
+    this.write = false;          // True if the operand is a write-op to reg/mem.
+
+    this.regType = "";           // Register operand's type.
+    this.memSize = -1;           // Memory operand's size.
+    this.immSign = "";           // Immediate sign (any / signed / unsigned).
+    this.immValue = null;        // Immediate value - `null` or `1` (only used by shift/rotate instructions).
+
+    this.rwxIndex = -1;          // Read/Write (RWX) index.
+    this.rwxWidth = -1;          // Read/Write (RWX) width.
   }
 
-  isReg() { return this.type === "reg" || this.type === "reg/mem"; }
-  isMem() { return this.type === "mem" || this.type === "reg/mem"; }
-  isImm() { return this.type === "imm"; }
-  isRel() { return this.type === "rel"; }
-  isRegMem() { return this.type === "reg/mem"; }
-  isRegList() { return this.type === "reg-list" }
-  isPartialOp() { return false; }
+  _getFlag(flag) {
+    return (this.flags & flag) != 0;
+  }
+
+  _setFlag(flag, value) {
+    this.flags = (this.flags & ~flag) | (value ? flag : 0);
+    return this;
+  }
+
+  get optional() { return this._getFlag(OperandFlags.Optional); }
+  set optional(value) { this._setFlag(OperandFlags.Optional, value); }
+
+  get implicit() { return this._getFlag(OperandFlags.Implicit); }
+  set implicit(value) { this._setFlag(OperandFlags.Implicit, value); }
+
+  get commutative() { return this._getFlag(OperandFlags.Commutative); }
+  set commutative(value) { this._setFlag(OperandFlags.Commutative, value); }
+
+  get zext() { return this._getFlag(OperandFlags.ZExt); }
+  set zext(value) { this._setFlag(OperandFlags.ZExt, value); }
 
   toString() { return this.data; }
+
+  isReg() { return !!this.reg; }
+  isMem() { return !!this.mem; }
+  isImm() { return !!this.imm; }
+  isRel() { return !!this.rel; }
+
+  isRegMem() { return this.reg && this.mem; }
+  isRegOrMem() { return !!this.reg || !!this.mem; }
+
+  isRegList() { return this.type === "reg-list" }
+  isPartialOp() { return false; }
 }
 base.Operand = Operand;
 
@@ -191,7 +236,7 @@ class Instruction {
       if (!attr) continue;
 
       const eq = attr.indexOf("=");
-      var key = eq === -1 ? attr   : attr.substr(0, eq);
+      var key = eq === -1 ? attr : attr.substr(0, eq);
       var val = eq === -1 ? "TRUE" : attr.substr(eq + 1);
 
       // apply shortcut, if defined.

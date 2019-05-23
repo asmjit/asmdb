@@ -71,6 +71,21 @@ const kCpuRegisters = buildCpuRegs(x86data.registers);
 // [asmdb.x86.Utils]
 // ============================================================================
 
+const RegSize = Object.freeze({
+  "r8"  : 8,
+  "r8hi": 8,
+  "r16" : 16,
+  "r32" : 32,
+  "r64" : 64,
+  "mm"  : 64,
+  "xmm" : 128,
+  "ymm" : 256,
+  "zmm" : 512,
+  "bnd" : 128,
+  "k"   : 64,
+  "st"  : 80
+});
+
 // X86/X64 utilities.
 class Utils {
   // Split the operand(s) string into individual operands as defined by the
@@ -101,6 +116,17 @@ class Utils {
   // Get a register type of a `s`, returns `null` if the register is unknown and `-1`
   // if the given string does only represent a register type, but not a specific reg.
   static regIndexOf(s) { return hasOwn.call(kCpuRegisters, s) ? kCpuRegisters[s].index : null; }
+
+  static regSize(s) {
+    if (s in RegSize)
+      return RegSize[s];
+
+    const reg = kCpuRegisters[s];
+    if (reg && reg.type in RegSize)
+      return RegSize[reg.type];
+
+    return -1;
+  }
 
   // Get size of an immediate `s` [in bits].
   //
@@ -146,26 +172,12 @@ class Operand extends base.Operand {
   constructor(data, defaultAccess) {
     super(data);
 
-    this.reg = "";             // Register operand's definition.
-    this.regType = "";         // Register operand's type.
-
-    this.mem = "";             // Memory operand's definition.
-    this.memSize = -1;         // Memory operand's size.
-    this.memOff = false;       // Memory operand is an absolute offset (only a specific version of MOV).
     this.memSeg = "";          // Segment specified with register that is used to perform a memory IO.
+    this.memOff = false;       // Memory operand is an absolute offset (only a specific version of MOV).
     this.memFar = false;       // Memory is a far pointer (includes segment in first two bytes).
     this.vsibReg = "";         // AVX VSIB register type (xmm/ymm/zmm).
     this.vsibSize = -1;        // AVX VSIB register size (32/64).
     this.bcstSize = -1;        // AVX-512 broadcast size.
-
-    this.imm = 0;              // Immediate operand's size.
-    this.immSign = "";         // Immediate sign (any / signed / unsigned).
-    this.immValue = null;      // Immediate value - `null` or `1` (only used by shift/rotate instructions).
-
-    this.rel = 0;              // Relative displacement operand's size.
-
-    this.rwxIndex = -1;        // Read/Write (RWX) index.
-    this.rwxWidth = -1;        // Read/Write (RWX) width.
 
     const type = [];
     var s = data;
@@ -303,8 +315,21 @@ class Operand extends base.Operand {
     this.data = oArr.join("/");
     this.type = type.join("/");
 
+    if (this.rwxIndex === -1) {
+      const opSize = this.isReg() ? this.regSize :
+                     this.isMem() ? this.memSize : -1;
+      if (opSize !== -1) {
+        this.rwxIndex = 0;
+        this.rwxWidth = opSize;
+      }
+    }
+
     if (!mAccess && this.isRegOrMem())
       this.setAccess(defaultAccess);
+  }
+
+  get regSize() {
+    return Utils.regSize(this.reg);
   }
 
   setAccess(x) {
@@ -315,16 +340,9 @@ class Operand extends base.Operand {
     return this;
   }
 
-  isReg() { return !!this.reg; }
-  isMem() { return !!this.mem; }
-  isImm() { return !!this.imm; }
-  isRel() { return !!this.rel; }
 
   isFixedReg() { return this.reg && this.reg !== this.regType && this.reg !== "st(i)"; }
   isFixedMem() { return this.memSeg && this.isFixedReg(); }
-
-  isRegOrMem() { return !!this.reg || !!this.mem; }
-  isRegAndMem() { return !!this.reg && !!this.mem; }
 
   isPartialOp() {
     const maybePartial = this.regType === "r8"   ||
@@ -367,7 +385,6 @@ class Instruction extends base.Instruction {
     this.w = "";               // Opcode W field.
     this.pp = "";              // Opcode PP part.
     this.mm = "";              // Opcode MM[MMM] part.
-    this.vvvv = "";            // Opcode VVVV part.
     this._67h = false;         // Instruction requires a size override prefix.
 
     this.rm = "";              // Instruction specific payload "/0..7".
@@ -452,8 +469,6 @@ class Instruction extends base.Instruction {
 
         // Process "EVEX", "VEX", and "XOP" prefixes.
         if (/^(?:EVEX|VEX|XOP)$/.test(comp)) { this.prefix = comp; continue; }
-        // Process "NDS/NDD/DDS".
-        if (/^(?:NDS|NDD|DDS)$/.test(comp)) { this.vvvv = comp; continue; }
 
         // Process `L` field.
         if (/^LIG$/      .test(comp)) { this.l = "LIG"; continue; }
