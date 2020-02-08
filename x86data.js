@@ -394,6 +394,7 @@ $export[$as] =
     ["bsr"              , "W:r32, r32/m32"                                  , "RM"      , "0F BD /r"                     , "ANY              OF=U SF=U ZF=W AF=U PF=U CF=U"],
     ["bsr"              , "W:r64, r64/m64"                                  , "RM"      , "REX.W 0F BD /r"               , "X64              OF=U SF=U ZF=W AF=U PF=U CF=U"],
 
+    ["bswap"            , "X:r16"                                           , "O"       , "66 0F C8+r"                   , "ANY"],
     ["bswap"            , "X:r32"                                           , "O"       , "0F C8+r"                      , "ANY"],
     ["bswap"            , "X:r64"                                           , "O"       , "REX.W 0F C8+r"                , "X64"],
 
