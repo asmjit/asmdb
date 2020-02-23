@@ -251,8 +251,8 @@ class Instruction {
         const base = dot === -1 ? "" : key.substr(0, dot + 1);
         const keys = (dot === -1 ? key : key.substr(dot + 1)).split("|");
 
-        for (var i = 0; i < keys.length; i++)
-          this._assignAttribute(base + keys[i], val);
+        for (var j = 0; j < keys.length; j++)
+          this._assignAttribute(base + keys[j], val);
       }
       else {
         this._assignAttribute(key, val);
