@@ -1557,7 +1557,7 @@ $export[$as] =
     ["fucomp"           , ""                                                , "NONE"    , "DD E9"                        , "FPU_POP          C0=W C1=W C2=W C3=W"],
     ["fucomp"           , "R:st(i)"                                         , "O"       , "DD E8+i"                      , "FPU_POP          C0=W C1=W C2=W C3=W"],
     ["fucompp"          , ""                                                , "NONE"    , "DA E9"                        , "FPU_POP=2        C0=W C1=W C2=W C3=W"],
-    ["fwait/wait"       , ""                                                , "NONE"    , "DB"                           , "FPU              C0=U C1=U C2=U C3=U"],
+    ["fwait/wait"       , ""                                                , "NONE"    , "9B"                           , "FPU              C0=U C1=U C2=U C3=U"],
     ["fxam"             , ""                                                , "NONE"    , "D9 E5"                        , "FPU              C0=W C1=W C2=W C3=W"],
     ["fxch"             , ""                                                , "NONE"    , "D9 C9"                        , "FPU              C0=U C1=0 C2=U C3=U"],
     ["fxch"             , "st(i)"                                           , "O"       , "D9 C8+i"                      , "FPU              C0=U C1=0 C2=U C3=U"],
