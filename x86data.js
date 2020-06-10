@@ -782,6 +782,8 @@ $export[$as] =
     ["movsx"            , "W:r64, r8/m8"                                    , "RM"      , "REX.W 0F BE /r"               , "X64"],
     ["movsx"            , "W:r32, r16/m16"                                  , "RM"      , "0F BF /r"                     , "ANY"],
     ["movsx"            , "W:r64, r16/m16"                                  , "RM"      , "REX.W 0F BF /r"               , "X64"],
+    ["movsxd"           , "W:r16, r16/m16"                                  , "RM"      , "66 63 /r"                     , "X64"],
+    ["movsxd"           , "W:r32, r32/m32"                                  , "RM"      , "63 /r"                        , "X64"],
     ["movsxd"           , "W:r64, r32/m32"                                  , "RM"      , "REX.W 63 /r"                  , "X64"],
 
     ["movzx"            , "w:r16, r8/m8"                                    , "RM"      , "66 0F B6 /r"                  , "ANY"],
