@@ -152,6 +152,7 @@ class Operand {
     this.write = false;          // True if the operand is a write-op to reg/mem.
 
     this.regType = "";           // Register operand's type.
+    this.regIndexRel = 0;        // Register index is relative to the previous register operand index (0 if not).
     this.memSize = -1;           // Memory operand's size.
     this.immSign = "";           // Immediate sign (any / signed / unsigned).
     this.immValue = null;        // Immediate value - `null` or `1` (only used by shift/rotate instructions).

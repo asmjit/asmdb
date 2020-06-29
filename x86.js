@@ -81,6 +81,7 @@ const RegSize = Object.freeze({
   "xmm" : 128,
   "ymm" : 256,
   "zmm" : 512,
+  "tmm" : 512, // Maximum size (64 bits).
   "bnd" : 128,
   "k"   : 64,
   "st"  : 80
@@ -103,7 +104,7 @@ class Utils {
   // Get whether the string `s` describes a register operand.
   static isRegOp(s) { return s && hasOwn.call(kCpuRegisters, s); }
   // Get whether the string `s` describes a memory operand.
-  static isMemOp(s) { return s && /^(?:mem|mib|(?:m(?:off)?\d+(?:dec|bcd|fp|int)?)|(?:m16_\d+)|(?:vm\d+(?:x|y|z)))$/.test(s); }
+  static isMemOp(s) { return s && /^(?:mem|mib|tmem|(?:m(?:off)?\d+(?:dec|bcd|fp|int)?)|(?:m16_\d+)|(?:vm\d+(?:x|y|z)))$/.test(s); }
   // Get whether the string `s` describes an immediate operand.
   static isImmOp(s) { return s && /^(?:1|i4|u4|ib|ub|iw|uw|id|ud|iq|uq)$/.test(s); }
   // Get whether the string `s` describes a relative displacement (label).
@@ -242,9 +243,16 @@ class Operand extends base.Operand {
         op = op.substr(3);
       }
 
+      var regIndexRel = 0;
+      if (op.endsWith("+1")) {
+        regIndexRel = 1;
+        op = op.substring(0, op.length - 2);
+      }
+
       if (Utils.isRegOp(op)) {
         this.reg = op;
         this.regType = Utils.regTypeOf(op);
+        this.regIndexRel = regIndexRel;
 
         type.push("reg");
         continue;
@@ -438,7 +446,10 @@ class Instruction extends base.Instruction {
     // Split into individual operands and push them to `operands`.
     const arr = Utils.splitOperands(s);
     for (var i = 0; i < arr.length; i++) {
-      this.operands.push(new Operand(arr[i].trim(), i === 0 ? "X" : "R"));
+      const operand = new Operand(arr[i].trim(), i === 0 ? "X" : "R");
+      if (operand.mem == "tmem")
+        this.attributes.Tsib = true;
+      this.operands.push(operand);
     }
   }
 
