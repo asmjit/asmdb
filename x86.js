@@ -395,8 +395,8 @@ class Instruction extends base.Instruction {
     this.mm = "";              // Opcode MM[MMM] part.
     this._67h = false;         // Instruction requires a size override prefix.
 
-    this.rm = "";              // Instruction specific payload "/0..7".
-    this.rmInt = -1;           // Instruction specific payload as integer (0-7).
+    this.modR = "";            // Instruction specific payload in ModRM byte (R part), specified as "/0..7".
+    this.modRM = "";           // Instruction specific payload in ModRM byte (RM part), specified as another opcode byte.
     this.ri = false;           // Instruction opcode is combined with register, "XX+r" or "XX+i".
     this.rel = 0;              // Displacement ("cb", "cw", and "cd" parts).
 
@@ -512,7 +512,7 @@ class Instruction extends base.Instruction {
 
         // Parse "/r" or "/0-7".
         if (/^\/[r0-7]$/.test(comp)) {
-          this.rm = comp.charAt(1);
+          this.modR = comp.charAt(1);
           continue;
         }
 
@@ -564,13 +564,6 @@ class Instruction extends base.Instruction {
             comp = comp.substr(0, 2);
           }
 
-          // Some instructions have form 0F AE XX, we treat the last byte as an opcode.
-          if (this.mm === "0F" && this.opcodeHex === "AE") {
-            this.mm += this.opcodeHex;
-            this.opcodeHex = comp;
-            continue;
-          }
-
           // FPU instructions are encoded as "PREFIX XX", where prefix is not the same
           // as MM prefixes used everywhere else. AsmJit internally extends MM field in
           // instruction tables to allow storing this prefix together with other "MM"
@@ -589,10 +582,24 @@ class Instruction extends base.Instruction {
           }
 
           if (this.opcodeHex) {
-            if (this.opcodeHex === "67")
+            if (this.opcodeHex === "67") {
               this._67h = true;
-            else
-              this.report(`'${this.opcodeString}' Multiple opcodes, have ${this.opcodeHex}, found ${comp}`);
+            }
+            else {
+              if (!this.modR && !this.modRM) {
+                const value = parseInt(comp, 16);
+                if ((value & 0xC0) == 0xC0) {
+                  this.modR = String((value >> 3) & 0x7);
+                  this.modRM = String((value >> 0) & 0x7);
+                }
+                else {
+                  this.report(`'${this.opcodeString}' Unsupported secondary opcode (MOD/RM) '${comp}' value`);
+                }
+              }
+              else {
+                this.report(`'${this.opcodeString}' Multiple opcodes, have ${this.opcodeHex}, found ${comp}`);
+              }
+            }
           }
 
           this.opcodeHex = comp;
@@ -600,8 +607,8 @@ class Instruction extends base.Instruction {
         }
 
         // Parse "/r" or "/0-7".
-        if (/^\/[r0-7]$/.test(comp) && !this.rm) {
-          this.rm = comp.charAt(1);
+        if (/^\/[r0-7]$/.test(comp) && !this.modR) {
+          this.modR = comp.charAt(1);
           continue;
         }
 
@@ -632,9 +639,6 @@ class Instruction extends base.Instruction {
 
     if (this.opcodeHex)
       this.opcodeValue = parseInt(this.opcodeHex, 16);
-
-    if (/^\/[0-7]$/.test(this.rm))
-      this.rmInt = parseInt(this.rm.substr(1), 10);
 
     if (!this.opcodeHex)
       this.report(`Couldn't parse instruction's opcode '${this.opcodeString}'`);
@@ -835,6 +839,20 @@ class Instruction extends base.Instruction {
       if (ops[i].isImm())
         n++;
     return n;
+  }
+
+  get modRValue() {
+    if (/^[0-7]$/.test(this.modR))
+      return parseInt(this.modR, 10);
+    else
+      return 0;
+  }
+
+  get modRMValue() {
+    if (/^[0-7]$/.test(this.modRM))
+      return parseInt(this.modRM, 10);
+    else
+      return 0;
   }
 }
 x86.Instruction = Instruction;

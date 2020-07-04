@@ -116,6 +116,8 @@ $export[$as] =
     { "name": "AVX512_VPOPCNTDQ"    },
     { "name": "BMI"                 },
     { "name": "BMI2"                },
+    { "name": "CET_IBT"             },
+    { "name": "CET_SS"              },
     { "name": "CLDEMOTE"            },
     { "name": "CLFLUSH"             },
     { "name": "CLFLUSHOPT"          },
@@ -148,12 +150,14 @@ $export[$as] =
     { "name": "MOVDIRI"             },
     { "name": "MPX"                 },
     { "name": "MSR"                 },
+    { "name": "OSPKE"               },
     { "name": "PCLMULQDQ"           },
     { "name": "PCOMMIT"             },
     { "name": "PCONFIG"             },
     { "name": "POPCNT"              },
     { "name": "PREFETCHW"           },
     { "name": "PREFETCHWT1"         },
+    { "name": "PTWRITE"             },
     { "name": "RDPID"               },
     { "name": "RDPRU"               },
     { "name": "RDRAND"              },
@@ -966,6 +970,8 @@ $export[$as] =
     ["test"             , "R:~r32/m32,~r32"                                 , "MR"      , "85 /r"                        , "ANY              OF=0 SF=W ZF=W AF=U PF=W CF=0"],
     ["test"             , "R:~r64/m64,~r64"                                 , "MR"      , "REX.W 85 /r"                  , "X64              OF=0 SF=W ZF=W AF=U PF=W CF=0"],
 
+    ["ud0"              , "r32/m32"                                         , "M"       , "0F FF /r"                     , "ANY"],
+    ["ud1"              , "r32/m32"                                         , "M"       , "0F B9 /r"                     , "ANY"],
     ["ud2"              , ""                                                , "NONE"    , "0F 0B"                        , "ANY"],
 
     ["xadd"             , "x:r8/m8, x:r8"                                   , "MR"      , "0F C0 /r"                     , "I486     _XLock  OF=W SF=W ZF=W AF=W PF=W CF=W"],
@@ -1127,9 +1133,9 @@ $export[$as] =
     ["ldmxcsr"          , "R:m32"                                           , "M"       , "0F AE /2"                     , "SSE              Volatile"],
     ["stmxcsr"          , "W:m32"                                           , "M"       , "0F AE /3"                     , "SSE              Volatile"],
 
-    ["lfence"           , ""                                                , "NONE"    , "0F AE /5"                     , "SSE2             Volatile"],
-    ["mfence"           , ""                                                , "NONE"    , "0F AE /6"                     , "SSE2             Volatile"],
-    ["sfence"           , ""                                                , "NONE"    , "0F AE /7"                     , "MMX2             Volatile"],
+    ["lfence"           , ""                                                , "NONE"    , "0F AE E8"                     , "SSE2             Volatile"],
+    ["mfence"           , ""                                                , "NONE"    , "0F AE F0"                     , "SSE2             Volatile"],
+    ["sfence"           , ""                                                , "NONE"    , "0F AE F8"                     , "MMX2             Volatile"],
 
     ["prefetch"         , "R:mem"                                           , "M"       , "0F 0D /0"                     , "3DNOW"],
     ["prefetchnta"      , "R:mem"                                           , "M"       , "0F 18 /0"                     , "MMX2"],
@@ -1147,11 +1153,15 @@ $export[$as] =
     ["clwb"             , "R:mem"                                           , "M"       , "66 0F AE /6"                  , "CLWB             Volatile"],
     ["clzero"           , "R:<ds:zax>"                                      , "NONE"    , "0F 01 FC"                     , "CLZERO           Volatile"],
 
+    ["ptwrite"          , "R:r32/m32"                                       , "M"       , "F3 0F AE /4"                  , "PTWRITE          Volatile"],
+    ["ptwrite"          , "R:r64/m64"                                       , "M"       , "REX.W F3 0F AE /4"            , "PTWRITE X64      Volatile"],
+
     ["serialize"        , ""                                                , "NONE"    , "0F 01 E8"                     , "SERIALIZE        Volatile"],
 
     ["rdpid"            , "W:r32"                                           , "R"       , "F3 0F C7 /7"                  , "RDPID X86        Volatile"],
     ["rdpid"            , "W:r64"                                           , "R"       , "F3 0F C7 /7"                  , "RDPID X64        Volatile"],
-    ["rdpru"            , "R:<ecx>, W:<edx>, W:<eax>"                       , "NONE"    , "0F 01 FD"                     , "RDPRU            Volatile"],
+    ["rdpkru"           , "W:<edx>, W:<eax>, R:<ecx>"                       , "NONE"    , "0F 01 EE"                     , "OSPKE            Volatile"],
+    ["rdpru"            , "W:<edx>, W:<eax>, R:<ecx>"                       , "NONE"    , "0F 01 FD"                     , "RDPRU            Volatile"],
     ["rdtsc"            , "W:<edx>, W:<eax>"                                , "NONE"    , "0F 31"                        , "RDTSC            Volatile"],
     ["rdtscp"           , "W:<edx>, W:<eax>, W:<ecx>"                       , "NONE"    , "0F 01 F9"                     , "RDTSCP           Volatile"],
 
@@ -1241,7 +1251,6 @@ $export[$as] =
     ["mwaitx"           , "R:<eax>, R:<ecx>, R:<ebx>"                       , "NONE"    , "0F 01 FB"                     , "MONITORX         Volatile"],
 
     ["mcommit"          , ""                                                , "NONE"    , "F3 0F 01 FA"                  , "MCOMMIT          Volatile OF=0 SF=0 ZF=0 AF=0 PF=0 CF=W"],
-    ["pcommit"          , ""                                                , "NONE"    , "66 0F AE F8"                  , "PCOMMIT          Volatile"],
 
     ["enqcmd"           , "W:es:r32, m512"                                  , "RM"      , "F2 0F 38 F8 /r"               , "ENQCMD X86       Volatile"],
     ["enqcmd"           , "W:es:r64, m512"                                  , "RM"      , "F2 0F 38 F8 /r"               , "ENQCMD X64       Volatile"],
@@ -1280,6 +1289,22 @@ $export[$as] =
 
     ["xresldtrk"        , ""                                                , "NONE"    , "F2 0F 01 E9"                  , "TSXLDTRK         Volatile"],
     ["xsusldtrk"        , ""                                                , "NONE"    , "F2 0F 01 E8"                  , "TSXLDTRK         Volatile"],
+
+    ["endbr32"          , ""                                                , "NONE"    , "F3 0F 1E FB"                  , "CET_IBT          Volatile"],
+    ["endbr64"          , ""                                                , "NONE"    , "F3 0F 1E FA"                  , "CET_IBT          Volatile"],
+
+    ["clrssbsy"         , "R:m64"                                           , "M"       , "F3 0F AE /6"                  , "CET_SS           Volatile PRIVILEGE=L0 OF=0 SF=0 ZF=0 AF=0 PF=0 CF=W"],
+    ["setssbsy"         , ""                                                , "NONE"    , "F3 0F 01 E8"                  , "CET_SS           Volatile PRIVILEGE=L0"],
+    ["incsspd"          , "r32"                                             , "M"       , "F3 0F AE /5"                  , "CET_SS           Volatile"],
+    ["incsspq"          , "r64"                                             , "M"       , "REX.W F3 0F AE /5"            , "CET_SS X64       Volatile"],
+    ["rdsspd"           , "W:r32"                                           , "M"       , "F3 0F 1E /1"                  , "CET_SS           Volatile"],
+    ["rdsspq"           , "W:r64"                                           , "M"       , "REX.W F3 0F 1E /1"            , "CET_SS X64       Volatile"],
+    ["rstorssp"         , "R:m64"                                           , "M"       , "F3 0F 01 /5"                  , "CET_SS           Volatile OF=0 SF=0 ZF=0 AF=0 PF=0 CF=W"],
+    ["saveprevssp"      , ""                                                , "NONE"    , "F3 0F 01 EA"                  , "CET_SS           Volatile OF=0 SF=0 ZF=0 AF=0 PF=0 CF=W"],
+    ["wrssd"            , "W:r32/m32, r32"                                  , "MR"      , "0F 38 F6 /r"                  , "CET_SS           Volatile"],
+    ["wrssq"            , "W:r64/m64, r64"                                  , "MR"      , "REX.W 0F 38 F6 /r"            , "CET_SS X64       Volatile"],
+    ["wrussd"           , "W:r32/m32, r32"                                  , "MR"      , "66 0F 38 F5 /r"               , "CET_SS           Volatile"],
+    ["wrussq"           , "W:r64/m64, r64"                                  , "MR"      , "REX.W 66 0F 38 F5 /r"         , "CET_SS X64       Volatile"],
 
     ["clts"             , ""                                                , "NONE"    , "0F 06"                        , "ANY              Volatile PRIVILEGE=L0"],
     ["hlt"              , ""                                                , "NONE"    , "F4"                           , "ANY              Volatile PRIVILEGE=L0"],
