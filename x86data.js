@@ -712,8 +712,10 @@ $export[$as] =
     ["nop"              , ""                                                , "NONE"    , "90"                           , ""],
     ["nop"              , "R:r16/m16"                                       , "M"       , "66 0F 1F /0"                  , ""],
     ["nop"              , "R:r32/m32"                                       , "M"       , "0F 1F /0"                     , ""],
+    ["nop"              , "R:r64/m64"                                       , "M"       , "REX.W 0F 1F /0"               , ""],
     ["nop"              , "R:r16/m16, r16"                                  , "MR"      , "66 0F 1F /r"                  , ""],
     ["nop"              , "R:r32/m32, r32"                                  , "MR"      , "0F 1F /r"                     , ""],
+    ["nop"              , "R:r64/m64, r64"                                  , "MR"      , "REX.W 0F 1F /r"               , ""],
 
     ["not"              , "x:r8/m8"                                         , "M"       , "F6 /2"                        , "ANY _XLock"],
     ["not"              , "x:r16/m16"                                       , "M"       , "66 F7 /2"                     , "ANY _XLock"],
