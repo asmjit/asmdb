@@ -496,10 +496,10 @@ $export[$as] =
     ["cmp"              , "R:r32, r32/m32"                                  , "RM"      , "3B /r"                        , "ANY              OF=W SF=W ZF=W AF=W PF=W CF=W"],
     ["cmp"              , "R:r64, r64/m64"                                  , "RM"      , "REX.W 3B /r"                  , "X64              OF=W SF=W ZF=W AF=W PF=W CF=W"],
 
-    ["cmpsb"            , "X:<ds:zsi>, X:<es:zdi>"                          , "NONE"    , "A6"                           , "ANY _Rep         OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
-    ["cmpsw"            , "X:<ds:zsi>, X:<es:zdi>"                          , "NONE"    , "66 A7"                        , "ANY _Rep         OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
-    ["cmpsd"            , "X:<ds:zsi>, X:<es:zdi>"                          , "NONE"    , "A7"                           , "ANY _Rep         OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
-    ["cmpsq"            , "X:<ds:zsi>, X:<es:zdi>"                          , "NONE"    , "REX.W A7"                     , "X64 _Rep         OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
+    ["cmpsb"            , "R:<ds:zsi>, R:<es:zdi>"                          , "NONE"    , "A6"                           , "ANY _Rep         OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
+    ["cmpsw"            , "R:<ds:zsi>, R:<es:zdi>"                          , "NONE"    , "66 A7"                        , "ANY _Rep         OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
+    ["cmpsd"            , "R:<ds:zsi>, R:<es:zdi>"                          , "NONE"    , "A7"                           , "ANY _Rep         OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
+    ["cmpsq"            , "R:<ds:zsi>, R:<es:zdi>"                          , "NONE"    , "REX.W A7"                     , "X64 _Rep         OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
 
     ["cmpxchg"          , "x:r8/m8, r8, <al>"                               , "MR"      , "0F B0 /r"                     , "I486             _XLock Volatile OF=W SF=W ZF=W AF=W PF=W CF=W"],
     ["cmpxchg"          , "x:r16/m16, r16, <ax>"                            , "MR"      , "66 0F B1 /r"                  , "I486             _XLock Volatile OF=W SF=W ZF=W AF=W PF=W CF=W"],
@@ -623,10 +623,10 @@ $export[$as] =
     ["lea"              , "W:r32, mem"                                      , "RM"      , "8D /r"                        , "ANY"],
     ["lea"              , "W:r64, mem"                                      , "RM"      , "REX.W 8D /r"                  , "X64"],
 
-    ["lodsb"            , "w:<al>, X:<ds:zsi>"                              , "NONE"    , "AC"                           , "ANY _Rep         DF=R"],
-    ["lodsw"            , "w:<ax>, X:<ds:zsi>"                              , "NONE"    , "66 AD"                        , "ANY _Rep         DF=R"],
-    ["lodsd"            , "W:<eax>, X:<ds:zsi>"                             , "NONE"    , "AD"                           , "ANY _Rep         DF=R"],
-    ["lodsq"            , "W:<rax>, X:<ds:zsi>"                             , "NONE"    , "REX.W AD"                     , "X64 _Rep         DF=R"],
+    ["lodsb"            , "w:<al>, R:<ds:zsi>"                              , "NONE"    , "AC"                           , "ANY _Rep         DF=R"],
+    ["lodsw"            , "w:<ax>, R:<ds:zsi>"                              , "NONE"    , "66 AD"                        , "ANY _Rep         DF=R"],
+    ["lodsd"            , "W:<eax>, R:<ds:zsi>"                             , "NONE"    , "AD"                           , "ANY _Rep         DF=R"],
+    ["lodsq"            , "W:<rax>, R:<ds:zsi>"                             , "NONE"    , "REX.W AD"                     , "X64 _Rep         DF=R"],
 
     ["loop"             , "x:<cx>, rel8"                                    , "D"       , "67 E2 cb"                     , "X86              Control=Branch"],
     ["loop"             , "X:<ecx>, rel8"                                   , "D"       , "E2 cb"                        , "X86              Control=Branch"],
@@ -680,10 +680,10 @@ $export[$as] =
     ["mov"              , "W:dreg, r32"                                     , "RM"      , "0F 23 /r"                     , "X86              OF=U SF=U ZF=U AF=U PF=U CF=U"],
     ["mov"              , "W:dreg, r64"                                     , "RM"      , "0F 23 /r"                     , "X64              OF=U SF=U ZF=U AF=U PF=U CF=U"],
 
-    ["movsb"            , "X:<es:zdi>, X:<ds:zsi>"                          , "NONE"    , "A4"                           , "ANY _Rep         DF=R"],
-    ["movsw"            , "X:<es:zdi>, X:<ds:zsi>"                          , "NONE"    , "66 A5"                        , "ANY _Rep         DF=R"],
-    ["movsd"            , "X:<es:zdi>, X:<ds:zsi>"                          , "NONE"    , "A5"                           , "ANY _Rep         DF=R"],
-    ["movsq"            , "X:<es:zdi>, X:<ds:zsi>"                          , "NONE"    , "REX.W A5"                     , "X64 _Rep         DF=R"],
+    ["movsb"            , "W:<es:zdi>, R:<ds:zsi>"                          , "NONE"    , "A4"                           , "ANY _Rep         DF=R"],
+    ["movsw"            , "W:<es:zdi>, R:<ds:zsi>"                          , "NONE"    , "66 A5"                        , "ANY _Rep         DF=R"],
+    ["movsd"            , "W:<es:zdi>, R:<ds:zsi>"                          , "NONE"    , "A5"                           , "ANY _Rep         DF=R"],
+    ["movsq"            , "W:<es:zdi>, R:<ds:zsi>"                          , "NONE"    , "REX.W A5"                     , "X64 _Rep         DF=R"],
 
     ["movsx"            , "w:r16, r8/m8"                                    , "RM"      , "66 0F BE /r"                  , "ANY"],
     ["movsx"            , "W:r32, r8/m8"                                    , "RM"      , "0F BE /r"                     , "ANY"],
@@ -874,10 +874,10 @@ $export[$as] =
     ["sbb"              , "X:r32, r32/m32"                                  , "RM"      , "1B /r"                        , "ANY              OF=W SF=W ZF=W AF=W PF=W CF=X"],
     ["sbb"              , "X:r64, r64/m64"                                  , "RM"      , "REX.W 1B /r"                  , "X64              OF=W SF=W ZF=W AF=W PF=W CF=X"],
 
-    ["scasb"            , "R:<al>, X:<es:zdi>"                              , "NONE"    , "AE"                           , "ANY _Rep         OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
-    ["scasw"            , "R:<ax>, X:<es:zdi>"                              , "NONE"    , "66 AF"                        , "ANY _Rep         OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
-    ["scasd"            , "R:<eax>, X:<es:zdi>"                             , "NONE"    , "AF"                           , "ANY _Rep         OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
-    ["scasq"            , "R:<rax>, X:<es:zdi>"                             , "NONE"    , "REX.W AF"                     , "X64 _Rep         OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
+    ["scasb"            , "R:<al>, R:<es:zdi>"                              , "NONE"    , "AE"                           , "ANY _Rep         OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
+    ["scasw"            , "R:<ax>, R:<es:zdi>"                              , "NONE"    , "66 AF"                        , "ANY _Rep         OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
+    ["scasd"            , "R:<eax>, R:<es:zdi>"                             , "NONE"    , "AF"                           , "ANY _Rep         OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
+    ["scasq"            , "R:<rax>, R:<es:zdi>"                             , "NONE"    , "REX.W AF"                     , "X64 _Rep         OF=W SF=W ZF=W AF=W PF=W CF=W DF=R"],
 
     ["seto"             , "w:r8/m8"                                         , "M"       , "0F 90 /r"                     , "ANY              OF=R"],
     ["setno"            , "w:r8/m8"                                         , "M"       , "0F 91 /r"                     , "ANY              OF=R"],
@@ -936,10 +936,10 @@ $export[$as] =
     ["shrd"             , "X:r64/m64, r64, cl"                              , "MR"      , "REX.W 0F AD /r"               , "X64              OF=W SF=W ZF=W AF=U PF=W CF=W"],
     ["shrd"             , "X:r64/m64, r64, ib/ub"                           , "MRI"     , "REX.W 0F AC /r ib"            , "X64              OF=W SF=W ZF=W AF=U PF=W CF=W"],
 
-    ["stosb"            , "X:<es:zdi>, R:<al>"                              , "NONE"    , "AA"                           , "ANY _Rep         DF=R"],
-    ["stosw"            , "X:<es:zdi>, R:<ax>"                              , "NONE"    , "66 AB"                        , "ANY _Rep         DF=R"],
-    ["stosd"            , "X:<es:zdi>, R:<eax>"                             , "NONE"    , "AB"                           , "ANY _Rep         DF=R"],
-    ["stosq"            , "X:<es:zdi>, R:<rax>"                             , "NONE"    , "REX.W AB"                     , "X64 _Rep         DF=R"],
+    ["stosb"            , "W:<es:zdi>, R:<al>"                              , "NONE"    , "AA"                           , "ANY _Rep         DF=R"],
+    ["stosw"            , "W:<es:zdi>, R:<ax>"                              , "NONE"    , "66 AB"                        , "ANY _Rep         DF=R"],
+    ["stosd"            , "W:<es:zdi>, R:<eax>"                             , "NONE"    , "AB"                           , "ANY _Rep         DF=R"],
+    ["stosq"            , "W:<es:zdi>, R:<rax>"                             , "NONE"    , "REX.W AB"                     , "X64 _Rep         DF=R"],
 
     ["sub"              , "x:al, ib/ub"                                     , "I"       , "2C ib"                        , "ANY AltForm      OF=W SF=W ZF=W AF=W PF=W CF=W"],
     ["sub"              , "x:ax, iw/uw"                                     , "I"       , "66 2D iw"                     , "ANY AltForm      OF=W SF=W ZF=W AF=W PF=W CF=W"],
