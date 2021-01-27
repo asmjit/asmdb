@@ -106,7 +106,7 @@ class Utils {
   // Get whether the string `s` describes a memory operand.
   static isMemOp(s) { return s && /^(?:mem|mib|tmem|(?:m(?:off)?\d+(?:dec|bcd|fp|int)?)|(?:m16_\d+)|(?:vm\d+(?:x|y|z)))$/.test(s); }
   // Get whether the string `s` describes an immediate operand.
-  static isImmOp(s) { return s && /^(?:1|i4|u4|ib|ub|iw|uw|id|ud|iq|uq)$/.test(s); }
+  static isImmOp(s) { return s && /^(?:1|i4|u4|ib|ub|iw|uw|id|ud|if|iq|uq|p16_16|p16_32)$/.test(s); }
   // Get whether the string `s` describes a relative displacement (label).
   static isRelOp(s) { return s && /^rel\d+$/.test(s); }
 
@@ -131,7 +131,7 @@ class Utils {
 
   // Get size of an immediate `s` [in bits].
   //
-  // Handles "ib", "iw", "id", "iq", and also "/is4".
+  // Handles "ib", "iw", "id", "if", "iq", and also "/is4".
   static immSize(s) {
     switch (s) {
       case "1"     : return 8;
@@ -147,6 +147,7 @@ class Utils {
       case "iq"    :
       case "uq"    : return 64;
       case "p16_16": return 32;
+      case "if"    :
       case "p16_32": return 48;
       default      : return -1;
     }
@@ -612,8 +613,8 @@ class Instruction extends base.Instruction {
           continue;
         }
 
-        // Parse immediate byte, word, dword, or qword.
-        if (/^(?:ib|iw|id|iq)$/.test(comp)) {
+        // Parse immediate byte, word, dword, fword, or qword.
+        if (/^(?:ib|iw|id|iq|if)$/.test(comp)) {
           this.imm += Utils.immSize(comp);
           continue;
         }
@@ -761,7 +762,7 @@ class Instruction extends base.Instruction {
         }
 
         // Every immediate should have its imm byte ("ib", "iw", "id", or "iq") in the opcode data.
-        m = this.opcodeString.match(/(?:^|\s+)(ib|iw|id|iq|\/is4)/g);
+        m = this.opcodeString.match(/(?:^|\s+)(ib|iw|id|if|iq|\/is4)/g);
         if (!m || m.length !== immCount) {
           isValid = false;
           this.report(`Immediate(s) [${immCount}] not found in opcode: ${this.opcodeString}`);

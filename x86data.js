@@ -72,7 +72,6 @@
 //
 // Here is a list of missing instructions to keep track of it:
 //
-// [ ] call/jmp/ret (far)
 // [ ] xlat/xlatb
 
 (function($export, $as) {
@@ -96,6 +95,7 @@ $export[$as] =
     { "name": "AMX_BF16"            },
     { "name": "AMX_INT8"            },
     { "name": "AVX"                 },
+    { "name": "AVX_VNNI"            },
     { "name": "AVX2"                },
     { "name": "AVX512_4FMAPS"       },
     { "name": "AVX512_4VNNIW"       },
@@ -135,6 +135,7 @@ $export[$as] =
     { "name": "FXSR"                },
     { "name": "GEODE"               },
     { "name": "HLE"                 },
+    { "name": "HRESET"              },
     { "name": "GFNI"                },
     { "name": "I486"                },
     { "name": "LAHFSAHF"            },
@@ -182,6 +183,7 @@ $export[$as] =
     { "name": "TBM"                 },
     { "name": "TSX"                 },
     { "name": "TSXLDTRK"            },
+    { "name": "UINTR"               },
     { "name": "VAES"                },
     { "name": "VPCLMULQDQ"          },
     { "name": "VMX"                 },
@@ -411,14 +413,6 @@ $export[$as] =
     ["call"             , "R:r32/m32"                                       , "M"       , "FF /2"                        , "X86 BND          Control=Call OF=U SF=U ZF=U AF=U PF=U CF=U"],
     ["call"             , "R:r64/m64"                                       , "M"       , "FF /2"                        , "X64 BND          Control=Call OF=U SF=U ZF=U AF=U PF=U CF=U"],
 
-    /*
-    ["call_far"         , "R:p16_16"                                        , "D"       , "66 9A id"                     , "X86              Control=Call OF=U SF=U ZF=U AF=U PF=U CF=U"],
-    ["call_far"         , "R:p16_32"                                        , "D"       , "9A if"                        , "X86              Control=Call OF=U SF=U ZF=U AF=U PF=U CF=U"],
-    ["call_far"         , "R:m16_16"                                        , "M"       , "66 FF /3"                     , "ANY              Control=Call OF=U SF=U ZF=U AF=U PF=U CF=U"],
-    ["call_far"         , "R:m16_32"                                        , "M"       , "FF /3"                        , "ANY              Control=Call OF=U SF=U ZF=U AF=U PF=U CF=U"],
-    ["call_far"         , "R:m16_64"                                        , "M"       , "REX.W FF /3"                  , "X64              Control=Call OF=U SF=U ZF=U AF=U PF=U CF=U"],
-    */
-
     ["cbw"              , "x:<ax>"                                          , "NONE"    , "66 98"                        , "ANY"],
     ["cwde"             , "X:<eax>"                                         , "NONE"    , "98"                           , "ANY"],
     ["cdqe"             , "X:<rax>"                                         , "NONE"    , "REX.W 98"                     , "X64"],
@@ -611,17 +605,21 @@ $export[$as] =
     ["jmp"              , "R:r32/m32"                                       , "D"       , "FF /4"                        , "X86 BND          Control=Jump"],
     ["jmp"              , "R:r64/m64"                                       , "D"       , "FF /4"                        , "X64 BND          Control=Jump"],
 
-    /*
-    ["jmp_far"          , "R:p16_16"                                        , "M"       , "66 EA id"                     , "X86              Control=Jump"],
-    ["jmp_far"          , "R:p16_32"                                        , "M"       , "EA if"                        , "X86              Control=Jump"],
-    ["jmp_far"          , "R:m16_16"                                        , "M"       , "66 FF /5"                     , "ANY              Control=Jump"],
-    ["jmp_far"          , "R:m16_32"                                        , "M"       , "FF /5"                        , "ANY              Control=Jump"],
-    ["jmp_far"          , "R:m16_64"                                        , "M"       , "REX.W FF /5"                  , "X64              Control=Jump"],
-    */
+    ["lcall"            , "iw, iw"                                          , "II"      , "66 9A iw iw"                  , "X86              Control=Call OF=U SF=U ZF=U AF=U PF=U CF=U"],
+    ["lcall"            , "iw, id"                                          , "II"      , "9A id iw"                     , "X86              Control=Call OF=U SF=U ZF=U AF=U PF=U CF=U"],
+    ["lcall"            , "R:m16_16"                                        , "M"       , "66 FF /3"                     , "ANY              Control=Call OF=U SF=U ZF=U AF=U PF=U CF=U"],
+    ["lcall"            , "R:m16_32"                                        , "M"       , "FF /3"                        , "ANY              Control=Call OF=U SF=U ZF=U AF=U PF=U CF=U"],
+    ["lcall"            , "R:m16_64"                                        , "M"       , "REX.W FF /3"                  , "X64              Control=Call OF=U SF=U ZF=U AF=U PF=U CF=U"],
 
     ["lea"              , "w:r16, mem"                                      , "RM"      , "67 8D /r"                     , "ANY"],
     ["lea"              , "W:r32, mem"                                      , "RM"      , "8D /r"                        , "ANY"],
     ["lea"              , "W:r64, mem"                                      , "RM"      , "REX.W 8D /r"                  , "X64"],
+
+    ["ljmp"             , "iw, iw"                                          , "II"      , "66 EA iw iw"                  , "X86              Control=Jump"],
+    ["ljmp"             , "iw, id"                                          , "II"      , "EA id iw"                     , "X86              Control=Jump"],
+    ["ljmp"             , "R:m16_16"                                        , "M"       , "66 FF /5"                     , "ANY              Control=Jump"],
+    ["ljmp"             , "R:m16_32"                                        , "M"       , "FF /5"                        , "ANY              Control=Jump"],
+    ["ljmp"             , "R:m16_64"                                        , "M"       , "REX.W FF /5"                  , "X64              Control=Jump"],
 
     ["lodsb"            , "w:<al>, R:<ds:zsi>"                              , "NONE"    , "AC"                           , "ANY _Rep         DF=R"],
     ["lodsw"            , "w:<ax>, R:<ds:zsi>"                              , "NONE"    , "66 AD"                        , "ANY _Rep         DF=R"],
@@ -640,6 +638,9 @@ $export[$as] =
     ["loopne"           , "X:<ecx>, rel8"                                   , "D"       , "E0 cb"                        , "X86              Control=Branch ZF=R"],
     ["loopne"           , "X:<ecx>, rel8"                                   , "D"       , "67 E0 cb"                     , "X64              Control=Branch ZF=R"],
     ["loopne"           , "X:<rcx>, rel8"                                   , "D"       , "E0 cb"                        , "X64              Control=Branch ZF=R"],
+
+    ["lret"             , ""                                                , "NONE"    , "CB"                           , "ANY              Control=Return"],
+    ["lret"             , "uw"                                              , "I"       , "CA iw"                        , "ANY              Control=Return"],
 
     ["mov"              , "w:r8/m8, r8"                                     , "MR"      , "88 /r"                        , "ANY XRelease"],
     ["mov"              , "w:r16/m16, r16"                                  , "MR"      , "66 89 /r"                     , "ANY XRelease"],
@@ -809,11 +810,6 @@ $export[$as] =
 
     ["ret"              , ""                                                , "NONE"    , "C3"                           , "ANY BND DummyRep Control=Return"],
     ["ret"              , "uw"                                              , "I"       , "C2 iw"                        , "ANY BND DummyRep Control=Return"],
-
-    /*
-    ["ret_far"          , ""                                                , "NONE"    , "CB"                           , "ANY              Control=Return"],
-    ["ret_far"          , "uw"                                              , "I"       , "CA iw"                        , "ANY              Control=Return"],
-    */
 
     ["rol"              , "x:r8/m8, 1"                                      , "M"       , "D0 /0"                        , "ANY AltForm      CF=W OF=W"],
     ["rol"              , "x:r8/m8, cl"                                     , "M"       , "D2 /0"                        , "ANY              CF=W OF=W"],
@@ -2774,6 +2770,15 @@ $export[$as] =
     ["vpshlq"           , "W:xmm, xmm/m128, xmm"                            , "RMV"     , "XOP.L0.P0.M09.W0 97 /r"       , "XOP"],
     ["vpshlw"           , "W:xmm, xmm, xmm/m128"                            , "RVM"     , "XOP.L0.P0.M09.W1 95 /r"       , "XOP"],
     ["vpshlw"           , "W:xmm, xmm/m128, xmm"                            , "RMV"     , "XOP.L0.P0.M09.W0 95 /r"       , "XOP"],
+
+    ["vpdpbusd"         , "X:xmm, xmm, xmm/m128"                            , "RVM"     , "VEX.128.66.0F38.W0 50 /r"     , "AVX_VNNI"],
+    ["vpdpbusd"         , "X:ymm, ymm, ymm/m256"                            , "RVM"     , "VEX.256.66.0F38.W0 50 /r"     , "AVX_VNNI"],
+    ["vpdpbusds"        , "X:xmm, xmm, xmm/m128"                            , "RVM"     , "VEX.128.66.0F38.W0 51 /r"     , "AVX_VNNI"],
+    ["vpdpbusds"        , "X:ymm, ymm, ymm/m256"                            , "RVM"     , "VEX.256.66.0F38.W0 51 /r"     , "AVX_VNNI"],
+    ["vpdpwssd"         , "X:xmm, xmm, xmm/m128"                            , "RVM"     , "VEX.128.66.0F38.W0 52 /r"     , "AVX_VNNI"],
+    ["vpdpwssd"         , "X:ymm, ymm, ymm/m256"                            , "RVM"     , "VEX.256.66.0F38.W0 52 /r"     , "AVX_VNNI"],
+    ["vpdpwssds"        , "X:xmm, xmm, xmm/m128"                            , "RVM"     , "VEX.128.66.0F38.W0 53 /r"     , "AVX_VNNI"],
+    ["vpdpwssds"        , "X:ymm, ymm, ymm/m256"                            , "RVM"     , "VEX.256.66.0F38.W0 53 /r"     , "AVX_VNNI"],
 
     ["kaddb"            , "W:k[7:0] ,~k[7:0] ,~k[7:0]"                      , "RVM"     , "VEX.L1.66.0F.W0 4A /r"        , "AVX512_DQ"],
     ["kaddd"            , "W:k[31:0],~k[31:0],~k[31:0]"                     , "RVM"     , "VEX.L1.66.0F.W1 4A /r"        , "AVX512_BW"],
