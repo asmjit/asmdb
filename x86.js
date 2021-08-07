@@ -81,7 +81,7 @@ const RegSize = Object.freeze({
   "xmm" : 128,
   "ymm" : 256,
   "zmm" : 512,
-  "tmm" : 512, // Maximum size (64 bits).
+  "tmm" : 512, // Maximum size (64 bytes).
   "bnd" : 128,
   "k"   : 64,
   "st"  : 80
@@ -245,8 +245,8 @@ class Operand extends base.Operand {
       }
 
       var regIndexRel = 0;
-      if (op.endsWith("+1")) {
-        regIndexRel = 1;
+      if (op.endsWith("+1") || op.endsWith("+2") || op.endsWith("+3")) {
+        regIndexRel = parseInt(op.substr(op.length - 1, 1));
         op = op.substring(0, op.length - 2);
       }
 
@@ -418,6 +418,8 @@ class Instruction extends base.Instruction {
     this.tupleType = "";       // AVX-512 tuple-type.
     this.elementSize = -1;     // Instruction's element size.
 
+    this.consecutiveLead = 0;  // Consecutive register leading N other registers.
+
     this._assignOperands(operands);
     this._assignEncoding(encoding);
     this._assignOpcode(opcode);
@@ -479,6 +481,10 @@ class Instruction extends base.Instruction {
       for (i = 0; i < prefix.length; i++) {
         comp = prefix[i];
 
+        // Ignore NP, it's just a placeholder.
+        if (comp == "NP")
+          continue;
+
         // Process "EVEX", "VEX", and "XOP" prefixes.
         if (/^(?:EVEX|VEX|XOP)$/.test(comp)) { this.prefix = comp; continue; }
 
@@ -492,8 +498,8 @@ class Instruction extends base.Instruction {
         if (comp === "P0") { /* ignored, `P` is zero... */ continue; }
         if (/^(?:66|F2|F3)$/.test(comp)) { this.pp = comp; continue; }
 
-        // Process `MM` field - 0F/0F3A/0F38/M8/M9.
-        if (/^(?:0F|0F3A|0F38|M08|M09|M0A)$/.test(comp)) { this.mm = comp; continue; }
+        // Process `MM` field - 0F/0F3A/0F38/MAP5/MAP6/M8/M9.
+        if (/^(?:0F|0F3A|0F38|MAP5|MAP6|M08|M09|M0A)$/.test(comp)) { this.mm = comp; continue; }
 
         // Process `W` field.
         if (/^WIG|W0|W1$/.test(comp)) { this.w = comp; continue; }
@@ -716,6 +722,9 @@ class Instruction extends base.Instruction {
   _updateOperandsInfo() {
     super._updateOperandsInfo();
 
+    var consecutiveLead = null;
+    var consecutiveLastIndex = 0;
+
     for (var i = 0; i < this.operands.length; i++) {
       const op = this.operands[i];
 
@@ -732,6 +741,26 @@ class Instruction extends base.Instruction {
         this.vsibReg = op.vsibReg;
         this.vsibSize = op.vsibSize;
       }
+
+      if (op.regIndexRel) {
+        if (i - op.regIndexRel < 0) {
+          this.report(`The consecutive register information is invalid, index of the lead (${i - op.regIndexRel}) is out of range`);
+        }
+        else {
+          const lead = this.operands[i - op.regIndexRel];
+          if (consecutiveLead && consecutiveLead != lead) {
+            this.report(`The consecutive register chain is invalid`);
+          }
+          else {
+            consecutiveLead = lead;
+            consecutiveLastIndex = Math.max(consecutiveLastIndex, op.regIndexRel);
+          }
+        }
+      }
+    }
+
+    if (consecutiveLead) {
+      consecutiveLead.consecutiveLeadCount = consecutiveLastIndex + 1;
     }
   }
 
