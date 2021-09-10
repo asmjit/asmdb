@@ -133,7 +133,7 @@ for (var i = 0; i < insts.length; i++) {
 const names = isa.instructionNames;
 for (var i = 0; i < names.length; i++) {
   const name = names[i];
-  const insts = x86.query(name);
+  const insts = isa.query(name);
   // ...
 }
 ```
