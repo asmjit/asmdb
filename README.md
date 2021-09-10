@@ -113,7 +113,7 @@ isa.instructions.forEach(function(inst) {
 // a single instruction each time it provides an array of instructions sharing the
 // same name.
 isa.forEachGroup(function(name, insts) {
-  console.log(`Instruction ${name}`:);
+  console.log(`Instruction ${name}:`);
   for (var i = 0; i < insts.length; i++) {
     const inst = insts[i];
     console.log(`  [${inst.encoding}] ${inst.opcodeString}`);
