@@ -1,3 +1,10 @@
+Important
+---------
+
+This project is discontinued.
+
+AsmDB was a separate project to provide instruction database for AsmJit and other tools, but primarily for AsmJit. Unfortunately the database used by AsmJit was often out of sync and it's almost impossible to know which AsmDB was used by AsmJit back in time. To solve this problem, AsmDB has been merged with AsmJit and resides now in asmjit/db directory of AsmJit project. This ensures that AsmJit's instruction tables are always in sync with AsmDB.
+
 AsmDB
 -----
 
